@@ -40,19 +40,29 @@ export interface ThemeColors {
     secondary: string;
     surface: string;
     subtle: string;
+    tertiary: string;
     hover: string;
+    brand: string;
+    brandSubtle: string;
+    greenSubtle: string;
   };
   text: {
     primary: string;
     secondary: string;
     tertiary: string;
     hoverPrimary?: string;
+    brand: string;
+    brandContrast: string;
+    green: string;
+    red: string;
   };
   border: {
     default: string;
     primary: string;
     secondary: string;
     divider: string;
+    tertiary: string;
+    brand: string;
   };
   accent: {
     positive: string;
@@ -102,19 +112,29 @@ const lightColors: ThemeColors = {
     secondary: 'bg-[#FAFAF8]',
     surface: 'bg-white',
     subtle: 'bg-[#F1EEE6]',
+    tertiary: 'bg-[#F1EEE6]',
     hover: 'hover:bg-black/[0.04]',
+    brand: 'bg-[#C9A36A]',
+    brandSubtle: 'bg-[#C9A36A]/10',
+    greenSubtle: 'bg-[#1FBF75]/10',
   },
   text: {
     primary: 'text-[#1C1C1C]',
     secondary: 'text-[#6B6B6B]',
     tertiary: 'text-[#9A9A9A]',
     hoverPrimary: 'hover:text-[#1C1C1C]',
+    brand: 'text-[#C9A36A]',
+    brandContrast: 'text-white',
+    green: 'text-[#1FBF75]',
+    red: 'text-[#E24A4A]',
   },
   border: {
     default: 'border-black/[0.08]',
     primary: 'border-black/[0.08]',
     secondary: 'border-black/[0.06]',
     divider: 'border-black/[0.06]',
+    tertiary: 'border-black/[0.04]',
+    brand: 'border-[#C9A36A]/20',
   },
   accent: {
     positive: 'text-[#1FBF75]',
@@ -146,19 +166,29 @@ const darkColors: ThemeColors = {
     secondary: 'bg-[#151515]',
     surface: 'bg-[#1a1a1a]',
     subtle: 'bg-[#2a2a2a]',
+    tertiary: 'bg-[#1f1f1f]',
     hover: 'hover:bg-white/[0.04]',
+    brand: 'bg-orange-600',
+    brandSubtle: 'bg-orange-600/20',
+    greenSubtle: 'bg-green-500/10',
   },
   text: {
     primary: 'text-white',
     secondary: 'text-gray-400',
     tertiary: 'text-gray-500',
     hoverPrimary: 'hover:text-white',
+    brand: 'text-orange-400',
+    brandContrast: 'text-white',
+    green: 'text-green-500',
+    red: 'text-red-500',
   },
   border: {
     default: 'border-[#2a2a2a]',
     primary: 'border-[#2a2a2a]',
     secondary: 'border-[#333333]',
     divider: 'border-white/[0.06]',
+    tertiary: 'border-[#2a2a2a]',
+    brand: 'border-orange-600/40',
   },
   accent: {
     positive: 'text-green-500',

@@ -51,18 +51,19 @@
           "recharts": "*",
           "sonner": "^2.0.3",
           "tailwind-merge": "*",
-          "tailwindcss": "*",
+          "tailwindcss": "^4.1.3",
           "url": "*",
           "vaul": "^1.1.2",
           "vite": "*",
           "zod": "*",
           "zustand": "*"
       },
-      "devDependencies": {
-          "@types/node": "^20.10.0",
-          "@vitejs/plugin-react-swc": "^3.10.2",
-          "vite": "6.3.5"
-      },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@tailwindcss/vite": "^4.1.3",
+    "@vitejs/plugin-react-swc": "^3.10.2",
+    "vite": "6.3.5"
+  },
       "scripts": {
           "dev": "vite",
           "build": "vite build"
