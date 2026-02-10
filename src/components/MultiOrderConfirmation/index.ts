@@ -1,0 +1,1 @@
+export { MultiOrderConfirmation } from './MultiOrderConfirmation';

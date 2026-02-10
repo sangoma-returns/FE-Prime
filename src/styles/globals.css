@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* Light institutional design system - Refined */
+  --background-primary: #F7F5EF;
+  --background-surface: #FFFFFF;
+  --background-subtle: #F1EEE6;
+  
+  --text-primary: #1C1C1C;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9A9A9A;
+  
+  --divider: rgba(0, 0, 0, 0.06);
+  
+  --accent-positive: #1FBF75;
+  --accent-negative: #E24A4A;
+  --accent-neutral: #C9C5BA;
+  
+  --button-primary-bg: #1FBF75;
+  --button-primary-text: #FFFFFF;
+  --button-danger-bg: #E24A4A;
+  --button-danger-text: #FFFFFF;
+  
+  --input-bg: #FFFFFF;
+  --input-border: rgba(0, 0, 0, 0.08);
+  --input-text: #1C1C1C;
+  --placeholder-text: #9A9A9A;
+  
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --active-overlay: rgba(0, 0, 0, 0.08);
+  --focus-color: #1FBF75;
+  
+  --radius: 6px;
+  
+  /* Legacy tokens for compatibility */
+  --background: #F7F5EF;
+  --foreground: #1C1C1C;
+  --border: rgba(0, 0, 0, 0.08);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+}
+
+.dark {
+  /* Dark mode tokens */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-[#F7F5EF] text-[#1C1C1C];
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'tnum' on, 'lnum' on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Refined typography system - Production density */
+  .text-header {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  
+  .text-numeric {
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 500;
+    font-feature-settings: 'tnum' on, 'lnum' on;
+    letter-spacing: 0;
+  }
+  
+  .text-numeric-large {
+    font-size: 20px;
+    line-height: 24px;
+    font-weight: 600;
+    font-feature-settings: 'tnum' on, 'lnum' on;
+    letter-spacing: -0.02em;
+  }
+  
+  .text-label {
+    font-size: 10px;
+    line-height: 14px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  
+  .text-button {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  
+  .text-body {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
