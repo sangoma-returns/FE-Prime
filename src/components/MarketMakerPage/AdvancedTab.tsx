@@ -1,23 +1,18 @@
-import { UseFormReturn } from 'react-hook-form';
+import { UseFormReturn } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { MarketMakerFormData, TOOLTIPS } from './types';
 import { Info } from 'lucide-react';
 import { Tooltip } from '../Tooltip';
 import { StrategySummary } from './StrategySummary';
 import { FormField } from './FormField';
-import { ExchangePairSelector } from '../ExchangePairSelector';
 
 interface AdvancedTabProps {
   form: UseFormReturn<MarketMakerFormData>;
-  exchanges: string[];
-  pairs: string[];
   onShowExchangePairSelector: () => void;
 }
 
 export function AdvancedTab({
   form,
-  exchanges,
-  pairs,
   onShowExchangePairSelector,
 }: AdvancedTabProps) {
   const { colors } = useThemeStore();

@@ -1,4 +1,4 @@
-import { useWatch, Control } from 'react-hook-form';
+import { useWatch, Control } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { MultiOrderFormData, TOOLTIPS, StrategyEstimates } from './types';
 import { ChevronDown, Trash2, Upload } from 'lucide-react';

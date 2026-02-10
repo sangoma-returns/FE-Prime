@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { UseFormReturn } from 'react-hook-form';
+import { UseFormReturn } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { EnterpriseFormData } from './types';
 import { Upload } from 'lucide-react';

@@ -1,1 +1,1 @@
-export { default } from './MarketMakerPage';
+export { default } from './MarketMakerPageRefactored';

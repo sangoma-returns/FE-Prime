@@ -1,4 +1,4 @@
-import { UseFormReturn } from 'react-hook-form';
+import { UseFormReturn } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { VaultFormData, VAULTS } from './types';
 import { FormField } from './FormField';

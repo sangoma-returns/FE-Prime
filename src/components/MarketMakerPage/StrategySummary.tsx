@@ -1,4 +1,4 @@
-import { useWatch } from 'react-hook-form';
+import { useWatch } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { MarketMakerFormData } from './types';
 

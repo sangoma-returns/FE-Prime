@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UseFieldArrayReturn, Control } from 'react-hook-form';
+import { UseFieldArrayReturn, Control } from 'react-hook-form@7.55.0';
 import { useThemeStore } from '../../stores/themeStore';
 import { MultiOrderFormData, StrategyFormData } from './types';
 import { Plus, ChevronDown, Upload, Trash2 } from 'lucide-react';
