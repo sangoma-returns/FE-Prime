@@ -2353,9 +2353,9 @@ export function AggregatorPage({
                     status: 'completed' as const,
                     volume: usdQuantity, // USDT value of the trade
                     buyQuantity: orderSide === 'buy' ? usdQuantity : undefined,
-                    buyLeverage: orderSide === 'buy' ? 1 : undefined,
+                    buyLeverage: orderSide === 'buy' ? leverage : undefined,
                     sellQuantity: orderSide === 'sell' ? usdQuantity : undefined,
-                    sellLeverage: orderSide === 'sell' ? 1 : undefined,
+                    sellLeverage: orderSide === 'sell' ? leverage : undefined,
                     buyExchange: orderSide === 'buy' ? exchange : undefined,
                     sellExchange: orderSide === 'sell' ? exchange : undefined,
                     buyPair: orderSide === 'buy' ? selectedAsset : undefined,
