@@ -2314,6 +2314,10 @@ export function AggregatorPage({
                   
                   // Calculate USDT quantity from amount
                   const usdQuantity = amount * price;
+                  // Prefer user-entered USDC amount if provided (avoids $0 when price hasn't loaded)
+                  const usdcNotional = usdtAmount && parseFloat(usdtAmount) > 0
+                    ? parseFloat(usdtAmount)
+                    : usdQuantity;
                   
                   // Generate order ID
                   const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -2352,9 +2356,9 @@ export function AggregatorPage({
                     exchange: exchange,
                     status: 'completed' as const,
                     volume: usdQuantity, // USDT value of the trade
-                    buyQuantity: orderSide === 'buy' ? usdQuantity : undefined,
+                    buyQuantity: orderSide === 'buy' ? usdcNotional : undefined,
                     buyLeverage: orderSide === 'buy' ? leverage : undefined,
-                    sellQuantity: orderSide === 'sell' ? usdQuantity : undefined,
+                    sellQuantity: orderSide === 'sell' ? usdcNotional : undefined,
                     sellLeverage: orderSide === 'sell' ? leverage : undefined,
                     buyExchange: orderSide === 'buy' ? exchange : undefined,
                     sellExchange: orderSide === 'sell' ? exchange : undefined,
