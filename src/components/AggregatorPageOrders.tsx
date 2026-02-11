@@ -259,7 +259,7 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
                       <div className="w-16 h-2 bg-gray-700 rounded-full overflow-hidden">
                         <div className="h-full bg-green-500" style={{ width: `${order.filled}%` }}></div>
                       </div>
-                      <span className={colors.text.secondary}>{order.filled}%</span>
+                      <span className={colors.text.secondary}>{isNaN(order.filled) ? 0 : order.filled}%</span>
                     </div>
                   </td>
                   <td className={`px-3 py-0.5 text-label ${order.statusColor} whitespace-nowrap`}>{order.status}</td>

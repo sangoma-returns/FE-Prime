@@ -741,9 +741,6 @@ function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade
         </table>
       </div>
 
-      {/* Exchange Execution Chart */}
-      <ExchangeExecutionChart colors={colors} exchanges={trade.exchanges || selectedExchanges} />
-
       {/* Metrics */}
       <div className="grid grid-cols-5 gap-1.5">
         <div className={`${colors.bg.surface} border ${colors.border.default} rounded px-2 py-1.5`}>

@@ -15,6 +15,26 @@ export interface Trade {
   notes?: string;
 }
 
+export interface Order {
+  id: string;
+  type: 'long' | 'short' | 'carry';
+  status: 'pending' | 'in-progress' | 'filled' | 'cancelled';
+  exchange: string;
+  token: string;
+  size: number;
+  price: number;
+  filled: number;
+  source?: 'market-maker' | 'aggregator' | 'carry';
+  carryTrade?: {
+    longExchange: string;
+    longToken: string;
+    longSize: number;
+    shortExchange: string;
+    shortToken: string;
+    shortSize: number;
+  };
+}
+
 export interface Position {
   symbol: string;
   exchange: string;
@@ -65,6 +85,7 @@ interface TradesStore {
   addTrade: (trade: Omit<Trade, 'id' | 'timestamp'>) => void;
   addOrder: (order: any) => void; // For compatibility
   addHistoryEntry: (entry: any) => void; // For compatibility
+  updateOrderProgress: (orderId: string, filled: number, status: Order['status']) => void;
   updatePositions: (currentPrices: Map<string, number>) => void;
   updatePositionFromTrade: (trade: Trade) => void;
   updateCachedPnl: () => void; // New method to update cached PNL
@@ -120,6 +141,14 @@ export const useTradesStore = create<TradesStore>((set, get) => ({
     set((state) => ({
       trades: [...state.trades, entry],
       history: [...state.history, entry],
+    }));
+  },
+  
+  updateOrderProgress: (orderId: string, filled: number, status: Order['status']) => {
+    set((state) => ({
+      openOrders: state.openOrders.map(order => 
+        order.id === orderId ? { ...order, filled, status } : order
+      ),
     }));
   },
   
@@ -389,11 +418,12 @@ export const useTradesActions = () => {
   const addTrade = useTradesStore((state) => state.addTrade);
   const addOrder = useTradesStore((state) => state.addOrder);
   const addHistoryEntry = useTradesStore((state) => state.addHistoryEntry);
+  const updateOrderProgress = useTradesStore((state) => state.updateOrderProgress);
   const updatePositions = useTradesStore((state) => state.updatePositions);
   const clearAllTrades = useTradesStore((state) => state.clearAllTrades);
   const snapshotPnl = useTradesStore((state) => state.snapshotPnl);
   
-  return { addTrade, addOrder, addHistoryEntry, updatePositions, clearAllTrades, snapshotPnl };
+  return { addTrade, addOrder, addHistoryEntry, updateOrderProgress, updatePositions, clearAllTrades, snapshotPnl };
 };
 
 // Export selectors (with proper caching)

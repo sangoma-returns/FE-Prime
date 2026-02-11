@@ -2264,6 +2264,9 @@ export function AggregatorPage({
                   // Calculate USDT quantity from amount
                   const usdQuantity = amount * price;
                   
+                  // Generate order ID
+                  const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  
                   // Record trade execution in new trades store
                   addTrade({
                     exchange: exchange,
@@ -2278,11 +2281,13 @@ export function AggregatorPage({
                   
                   // Add order to compatibility store
                   addOrder({
+                    id: orderId,
                     type: orderSide === 'buy' ? 'long' : 'short',
                     exchange: exchange,
                     token: token,
                     size: amount,
                     price: price,
+                    filled: 0,
                     status: 'pending',
                     source: 'aggregator',
                   });
