@@ -217,8 +217,6 @@ export function AggregatorPage({
   // Parse selectedAsset to get base and quote tokens
   const baseToken = selectedAsset.split(':')[0]; // e.g., "BTC", "SILVER", "AAPL"
   const assetSymbol = selectedAsset.split(':')[1] || baseToken; // e.g., "SILVER", "AAPL"
-  const isBtcAmountLocked = usdtAmount.trim().length > 0;
-  const isUsdtAmountLocked = btcAmount.trim().length > 0;
   const quoteToken = 'USD'; // We use USD for trading pairs
   
   // Get current price and data for selected asset
