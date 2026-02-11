@@ -123,6 +123,15 @@ export function AggregatorPage({
   // Form input states
   const [btcAmount, setBtcAmount] = useState('');
   const [usdtAmount, setUsdtAmount] = useState('');
+  const isBtcAmountLocked = usdtAmount.trim().length > 0;
+  const isUsdtAmountLocked = btcAmount.trim().length > 0;
+  const sanitizeNumberInput = (value: string) => {
+    const normalized = value.replace(/,/g, '.');
+    const cleaned = normalized.replace(/[^0-9.]/g, '');
+    const firstDot = cleaned.indexOf('.');
+    if (firstDot === -1) return cleaned;
+    return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  };
   const [limitPrice, setLimitPrice] = useState('');
   const [limitPriceMode, setLimitPriceMode] = useState('Dynamic');
   const [duration, setDuration] = useState('5');
@@ -1441,13 +1450,14 @@ export function AggregatorPage({
                   placeholder={baseToken}
                   value={btcAmount}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const value = sanitizeNumberInput(e.target.value);
                     setBtcAmount(value);
                     if (value.trim().length > 0) {
                       setUsdtAmount('');
                     }
                   }}
                   disabled={isBtcAmountLocked}
+                  inputMode="decimal"
                   className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isBtcAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 <input
@@ -1455,13 +1465,14 @@ export function AggregatorPage({
                   placeholder={quoteToken}
                   value={usdtAmount}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const value = sanitizeNumberInput(e.target.value);
                     setUsdtAmount(value);
                     if (value.trim().length > 0) {
                       setBtcAmount('');
                     }
                   }}
                   disabled={isUsdtAmountLocked}
+                  inputMode="decimal"
                   className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isUsdtAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
@@ -1472,6 +1483,11 @@ export function AggregatorPage({
                   <input type="range" className="flex-1 h-1" />
                   <span className={`text-[10px] ${colors.text.tertiary}`}>0.00 BTC</span>
                 </div>
+              </div>
+
+              {/* Leverage */}
+              <div className="space-y-2 mt-4">
+                <label className={`block text-label ${colors.text.tertiary}`}>Leverage</label>
                 <div className="flex items-center gap-2">
                   <input type="range" className="flex-1 h-1" />
                   <span className={`text-[10px] ${colors.text.tertiary}`}>0.00 USDT</span>
