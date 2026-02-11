@@ -264,7 +264,7 @@ export function AggregatorPage({
     return {
       symbol: asset.perpSymbol,
       volume24h: asset.marketData.volume24h > 0 
-        ? '$' + (asset.marketData.volume24h * asset.marketData.price / 1000000000).toFixed(1) + 'B' 
+        ? '$' + (asset.marketData.volume24h / 1000000000).toFixed(1) + 'B' 
         : '--',
       oi: formatOI(asset.marketData.openInterest),
       change24h: asset.marketData.priceChangePercent24h,
