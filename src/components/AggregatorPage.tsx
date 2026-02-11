@@ -2125,9 +2125,21 @@ export function AggregatorPage({
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className={`text-label ${colors.text.tertiary}`}>USDT Amount</div>
+                    <div className={`text-label ${colors.text.tertiary}`}>USDC Amount</div>
                     <div className={`text-body ${colors.text.primary}`} style={{ fontFeatureSettings: '"tnum" on' }}>
-                      {usdtAmount || '0.00'} USDT
+                      {usdtAmount || '0.00'} USDC
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className={`text-label ${colors.text.tertiary}`}>Leverage</div>
+                    <div className={`text-body ${colors.text.primary}`} style={{ fontFeatureSettings: '"tnum" on' }}>
+                      {leverage}x
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className={`text-label ${colors.text.tertiary}`}>Position Amount</div>
+                    <div className={`text-body ${colors.text.primary}`} style={{ fontFeatureSettings: '"tnum" on' }}>
+                      {(Math.max(0, (parseFloat(usdtAmount) || 0) * leverage)).toFixed(2)} USDC
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
