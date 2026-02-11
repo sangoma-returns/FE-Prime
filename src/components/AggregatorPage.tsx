@@ -208,6 +208,8 @@ export function AggregatorPage({
   // Parse selectedAsset to get base and quote tokens
   const baseToken = selectedAsset.split(':')[0]; // e.g., "BTC", "SILVER", "AAPL"
   const assetSymbol = selectedAsset.split(':')[1] || baseToken; // e.g., "SILVER", "AAPL"
+  const isBtcAmountLocked = usdtAmount.trim().length > 0;
+  const isUsdtAmountLocked = btcAmount.trim().length > 0;
   const quoteToken = 'USD'; // We use USD for trading pairs
   
   // Get current price and data for selected asset
@@ -1438,15 +1440,29 @@ export function AggregatorPage({
                   type="text"
                   placeholder={baseToken}
                   value={btcAmount}
-                  onChange={(e) => setBtcAmount(e.target.value)}
-                  className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary}`}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setBtcAmount(value);
+                    if (value.trim().length > 0) {
+                      setUsdtAmount('');
+                    }
+                  }}
+                  disabled={isBtcAmountLocked}
+                  className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isBtcAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 <input
                   type="text"
                   placeholder={quoteToken}
                   value={usdtAmount}
-                  onChange={(e) => setUsdtAmount(e.target.value)}
-                  className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary}`}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setUsdtAmount(value);
+                    if (value.trim().length > 0) {
+                      setBtcAmount('');
+                    }
+                  }}
+                  disabled={isUsdtAmountLocked}
+                  className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isUsdtAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
 
