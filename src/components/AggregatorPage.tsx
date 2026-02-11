@@ -134,6 +134,7 @@ export function AggregatorPage({
   };
   const [limitPrice, setLimitPrice] = useState('');
   const [limitPriceMode, setLimitPriceMode] = useState('Dynamic');
+  const [leverage, setLeverage] = useState(1);
   const [duration, setDuration] = useState('5');
   const [timezone, setTimezone] = useState('Europe/London UTC+00:00');
   const [timeStart, setTimeStart] = useState('01/23/2026 20:00');
@@ -1487,8 +1488,16 @@ export function AggregatorPage({
               <div className="space-y-2 mt-4">
                 <label className={`block text-label ${colors.text.tertiary}`}>Leverage</label>
                 <div className="flex items-center gap-2">
-                  <input type="range" className="flex-1 h-1" />
-                  <span className={`text-[10px] ${colors.text.tertiary}`}>0.00 USDT</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={leverage}
+                    onChange={(e) => setLeverage(Number(e.target.value))}
+                    className="flex-1 h-1"
+                  />
+                  <span className={`text-[10px] ${colors.text.tertiary}`}>{leverage}x</span>
                 </div>
               </div>
 
