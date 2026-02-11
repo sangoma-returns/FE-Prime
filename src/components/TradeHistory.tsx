@@ -198,7 +198,14 @@ export default function TradeHistory({ activeOrder, onClearActiveOrder, initialD
   // Set initial selected trade based on parameters to avoid flickering
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(() => {
     if (activeOrder) {
-      // Convert Order to Trade format
+      // Prefer latest history entry (has leverage/USDC notional) when available
+      const latestHistoryTrade = globalHistoryTrades.length > 0
+        ? globalHistoryTrades[globalHistoryTrades.length - 1]
+        : null;
+      if (latestHistoryTrade) {
+        return latestHistoryTrade;
+      }
+      // Fallback: Convert Order to Trade format
       return {
         pair: activeOrder.buyPair,
         side: 'Single',
