@@ -5,6 +5,7 @@ import { useTradesStore } from '../../stores/tradesStore';
 import { useMarketDataStore } from '../../stores/marketDataStore';
 import type { ActiveMarketMakerStrategy } from '../../stores/appStore';
 import { ChevronDown, Info, Plus, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { ExchangePairSelector } from '../ExchangePairSelector';
 
 interface MarketMakerPageProps {
@@ -75,7 +76,7 @@ export default function MarketMakerPage({
 }: MarketMakerPageProps) {
   const { colors } = useThemeStore();
   const deployMarketMakerStrategies = useAppStore((s) => s.deployMarketMakerStrategies);
-  const { addTrade, addOrder } = useTradesStore();
+  const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
   const { exchanges, assets, getAsset } = useMarketDataStore();
   
   // Get exchanges and pairs from centralized store
@@ -1571,9 +1572,14 @@ export default function MarketMakerPage({
             {/* Start Button */}
             <div className="relative group">
               <button
-                disabled={!selectedExchange || !selectedPair || !margin}
                 onClick={() => {
-                  if (!selectedExchange || !selectedPair || !margin) return;
+                  if (!selectedExchange || !selectedPair || !margin) {
+                    toast.error('Select an exchange, trading pair, and margin to start.');
+                    if (!selectedExchange || !selectedPair) {
+                      setShowExchangePairSelector(true);
+                    }
+                    return;
+                  }
                   
                   // Create strategy for advanced bot
                   const strategyId = `advanced-${selectedPair.replace('/', '')}-${Date.now()}`;
@@ -1637,11 +1643,33 @@ export default function MarketMakerPage({
                   leverage: parseFloat(leverage) || 1,
                   volume: parseFloat(volume), // Explicit volume: margin × leverage × 20
                 });
+
+                // Add history entry so TradeHistory can show execution detail immediately
+                addHistoryEntry({
+                  type: 'trade',
+                  action: `MM: ${token} on ${selectedExchange}`,
+                  amount: tokenSize,
+                  token: token,
+                  exchange: selectedExchange,
+                  status: 'completed',
+                  volume: parseFloat(volume) || 0,
+                  buyQuantity: orderAmountUSDC,
+                  buyLeverage: parseFloat(leverage) || 1,
+                  buyExchange: selectedExchange,
+                  buyPair: selectedPair,
+                  buyPrice: price,
+                  duration: parseFloat(refreshTime) || 5,
+                  exchanges: [selectedExchange],
+                  source: 'market-maker',
+                  timestamp: Date.now(),
+                });
                 
-                // Navigate to strategy monitor
-                onNavigateToStrategy?.(strategyId);
+                // Navigate to Portfolio -> History after starting
+                toast.success('Market making started.');
+                window.history.pushState({}, '', `/portfolio?tab=history&detailTab=execution&trade=mm`);
+                window.dispatchEvent(new CustomEvent('navigation'));
               }}
-                className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed`}
+                className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all`}
               >
                 Start Market Making
               </button>
