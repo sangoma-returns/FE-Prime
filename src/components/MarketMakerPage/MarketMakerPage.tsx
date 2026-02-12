@@ -1668,7 +1668,15 @@ export default function MarketMakerPage({
                 
                 // Navigate to Portfolio -> History after starting
                 toast.success('Market making started.');
-                navigateTo('portfolio', 'tab=history&detailTab=execution&trade=mm');
+                const targetQuery = 'tab=history&detailTab=execution&trade=mm';
+                const targetUrl = `/portfolio?${targetQuery}`;
+                navigateTo('portfolio', targetQuery);
+                // Hard fallback if the SPA navigation doesn't trigger in production
+                setTimeout(() => {
+                  if (!window.location.pathname.startsWith('/portfolio')) {
+                    window.location.assign(targetUrl);
+                  }
+                }, 50);
               }}
                 className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all`}
               >
