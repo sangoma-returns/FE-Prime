@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useThemeStore } from '../../stores/themeStore';
+import { useNavigation } from '../../hooks/useNavigation';
 import { useAppStore } from '../../stores/appStore';
 import { useTradesStore } from '../../stores/tradesStore';
 import { useMarketDataStore } from '../../stores/marketDataStore';
@@ -75,6 +76,7 @@ export default function MarketMakerPage({
   onNavigateToStrategy,
 }: MarketMakerPageProps) {
   const { colors } = useThemeStore();
+  const { navigateTo } = useNavigation();
   const deployMarketMakerStrategies = useAppStore((s) => s.deployMarketMakerStrategies);
   const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
   const { exchanges, assets, getAsset } = useMarketDataStore();
@@ -1666,8 +1668,7 @@ export default function MarketMakerPage({
                 
                 // Navigate to Portfolio -> History after starting
                 toast.success('Market making started.');
-                window.history.pushState({}, '', `/portfolio?tab=history&detailTab=execution&trade=mm`);
-                window.dispatchEvent(new CustomEvent('navigation'));
+                navigateTo('portfolio', 'tab=history&detailTab=execution&trade=mm');
               }}
                 className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all`}
               >
