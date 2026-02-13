@@ -220,31 +220,46 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     setActiveTab('overview');
   };
 
+  const effectiveTotalEquity =
+    equityMetrics.totalEquity > 0
+      ? equityMetrics.totalEquity
+      : (backendSummary?.totalEquity ?? 0);
+  const effectiveRealizedPnl =
+    Math.abs(equityMetrics.realizedPnl) > 0
+      ? equityMetrics.realizedPnl
+      : (backendSummary?.unrealizedPnL ?? 0);
+  const effectiveUnrealizedPnl =
+    Math.abs(equityMetrics.unrealizedPnl) > 0
+      ? equityMetrics.unrealizedPnl
+      : (backendSummary?.unrealizedPnL ?? 0);
+
   const stats = [
     { 
       label: 'Total Equity', 
-      value: `$${(backendSummary?.totalEquity ?? equityMetrics.totalEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: `$${effectiveTotalEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: '+2.4%',
-      isPositive: (backendSummary?.totalEquity ?? equityMetrics.totalEquity) >= 0,
+      isPositive: effectiveTotalEquity >= 0,
       icon: Wallet
     },
     { 
       label: 'PnL', 
-      value: `${(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: `${effectiveRealizedPnl >= 0 ? '+' : ''}$${Math.abs(effectiveRealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: '24h',
-      isPositive: (backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0,
+      isPositive: effectiveRealizedPnl >= 0,
       icon: TrendingUp
     },
     { 
       label: 'Unrealized PNL', 
-      value: `${(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: `${effectiveUnrealizedPnl >= 0 ? '+' : ''}$${Math.abs(effectiveUnrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: '24h',
-      isPositive: (backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0,
+      isPositive: effectiveUnrealizedPnl >= 0,
       icon: BarChart3
     },
     { 
       label: 'Directional Bias', 
-      value: `${(backendSummary?.directionalBiasPercent ?? directionalBiasPercent).toFixed(2)}%`,
+      value: `${(backendSummary?.directionalBiasPercent && Math.abs(backendSummary.directionalBiasPercent) > 0
+        ? backendSummary.directionalBiasPercent
+        : directionalBiasPercent).toFixed(2)}%`,
       change: 'Neutral',
       isPositive: null,
       icon: Scale

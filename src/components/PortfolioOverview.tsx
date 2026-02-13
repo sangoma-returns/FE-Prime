@@ -34,7 +34,7 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
   // Calculate equity distribution
   const equityStats = useMemo(() => {
     // 1. Unlocked vault equity (depositAmount in vault)
-    const unlockedVaultEquity = backendSummary?.cashUsd ?? depositAmount;
+    const unlockedVaultEquity = depositAmount;
     
     // 2. Exchange equity (total funds allocated to exchanges)
     const exchangeEquity = Object.values(exchangeAllocations).reduce((sum, amount) => sum + amount, 0);
@@ -52,7 +52,11 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
       return sum + strategy.margin;
     }, 0);
     
-    const lockedMarginEquity = backendSummary?.lockedMargin ?? (positionsMargin + marketMakerMargin);
+    const computedLockedMargin = positionsMargin + marketMakerMargin;
+    const lockedMarginEquity =
+      computedLockedMargin > 0
+        ? computedLockedMargin
+        : (backendSummary?.lockedMargin ?? 0);
     
     // 4. Unlocked margin equity (amount in exchanges that is not currently in a position)
     const unlockedMarginEquity = Math.max(0, exchangeEquity - lockedMarginEquity);
@@ -61,12 +65,20 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     const oldPnL = openPositions.reduce((sum, position) => sum + (position.pnl || 0), 0);
     const livePnL = totalPnl; // From useLivePositions hook
     const combinedPnL = oldPnL + livePnL;
-    const totalEquity = backendSummary?.totalEquity ?? (unlockedVaultEquity + exchangeEquity + combinedPnL);
+    const computedTotalEquity = unlockedVaultEquity + exchangeEquity + combinedPnL;
+    const totalEquity =
+      computedTotalEquity > 0
+        ? computedTotalEquity
+        : (backendSummary?.totalEquity ?? 0);
     
     // 6. Calculate total volume from trade history (using volume field which accounts for leverage)
-    const totalVolume = backendSummary?.totalVolume ?? history
+    const computedVolume = history
       .filter(entry => entry.type === 'trade')
       .reduce((sum, entry) => sum + (entry.volume || 0), 0);
+    const totalVolume =
+      computedVolume > 0
+        ? computedVolume
+        : (backendSummary?.totalVolume ?? 0);
     
     return {
       totalEquity,
@@ -75,7 +87,7 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
       lockedMarginEquity,
       unlockedMarginEquity,
       totalVolume,
-      totalPnL: backendSummary?.unrealizedPnL ?? combinedPnL,
+      totalPnL: Math.abs(combinedPnL) > 0 ? combinedPnL : (backendSummary?.unrealizedPnL ?? 0),
     };
   }, [depositAmount, exchangeAllocations, openPositions, activeMarketMakerStrategies, history, totalPnl, backendSummary]);
 
