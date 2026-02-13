@@ -11,7 +11,6 @@ import { MockWalletProvider, useMockWallet } from "./contexts/MockWalletContext"
 
 // Stores
 import { useAppStore } from "./stores/appStore";
-import { useThemeStore } from "./stores/themeStore";
 import { useMarketDataStore } from "./stores/marketDataStore";
 
 // Components
@@ -41,8 +40,8 @@ import { logger } from "./utils/logger";
 
 const AppContent: FC = () => {
   // Zustand Stores
-  const theme = useThemeStore((s) => s.theme);
-  const { setExchanges, refreshAllAssets } = useMarketDataStore();
+  const setExchanges = useMarketDataStore((s) => s.setExchanges);
+  const refreshAllAssets = useMarketDataStore((s) => s.refreshAllAssets);
   const hasDeposited = useAppStore((s) => s.hasDeposited);
   const hasBitfrostAccount = useAppStore(
     (s) => s.hasBitfrostAccount,
