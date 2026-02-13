@@ -95,9 +95,10 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     const safeRealized = Number.isFinite(realizedPnl) ? realizedPnl : 0;
     const safeUnrealized = Number.isFinite(unrealizedPnl) ? unrealizedPnl : 0;
     const totalEquity = effectiveBaseEquity + safeRealized + safeUnrealized;
+    const safeTotalEquity = Number.isFinite(totalEquity) ? totalEquity : effectiveBaseEquity;
     
     return {
-      totalEquity,
+      totalEquity: safeTotalEquity,
       exchangeEquity,
       realizedPnl,
       unrealizedPnl,

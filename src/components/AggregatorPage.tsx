@@ -2250,6 +2250,11 @@ export function AggregatorPage({
                     leverage: leverage,
                   }, true); // Skip auto history since we add manually below
                   
+                  // Check if this is an arbitrage trade (two exchanges selected)
+                  const isArbitrageTrade = selectedExchanges.length >= 2;
+                  const leverageValue = Number.isFinite(leverage) && leverage > 0 ? leverage : 1;
+                  const volumeNotional = usdcNotional * leverageValue * (isArbitrageTrade ? 2 : 1);
+
                   // Add to history with complete trade details
                   const historyEntry = {
                     type: 'trade' as const,
@@ -2258,11 +2263,11 @@ export function AggregatorPage({
                     token: token,
                     exchange: exchange,
                     status: 'completed' as const,
-                    volume: usdQuantity, // USDC value of the trade
+                    volume: volumeNotional, // Notional * leverage (x2 if arbitrage)
                     buyQuantity: orderSide === 'buy' ? usdcNotional : undefined,
-                    buyLeverage: orderSide === 'buy' ? leverage : undefined,
+                    buyLeverage: orderSide === 'buy' ? leverageValue : undefined,
                     sellQuantity: orderSide === 'sell' ? usdcNotional : undefined,
-                    sellLeverage: orderSide === 'sell' ? leverage : undefined,
+                    sellLeverage: orderSide === 'sell' ? leverageValue : undefined,
                     buyExchange: orderSide === 'buy' ? exchange : undefined,
                     sellExchange: orderSide === 'sell' ? exchange : undefined,
                     duration: parseFloat(duration) || 5,
@@ -2289,8 +2294,6 @@ export function AggregatorPage({
                   }
                   
                   // === CREATE POSITION WITH LIVE DATA ===
-                  // Check if this is an arbitrage trade (two exchanges selected)
-                  const isArbitrageTrade = selectedExchanges.length >= 2;
                   
                   // Build position legs based on trade type
                   const positionLegs = [];

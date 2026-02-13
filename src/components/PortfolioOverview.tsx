@@ -72,12 +72,13 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     const safeOldPnL = Number.isFinite(oldPnL) ? oldPnL : 0;
     const safeLivePnL = Number.isFinite(livePnL) ? livePnL : 0;
     const combinedPnL = safeOldPnL + safeLivePnL;
-    const computedTotalEquity = unlockedVaultEquity + exchangeEquity + combinedPnL;
+    const baseEquity = unlockedVaultEquity + exchangeEquity;
+    const computedTotalEquity = baseEquity + combinedPnL;
     const safeComputedTotalEquity = Number.isFinite(computedTotalEquity) ? computedTotalEquity : 0;
     const totalEquity =
       safeComputedTotalEquity > 0
         ? safeComputedTotalEquity
-        : (backendSummary?.totalEquity ?? 0);
+        : (baseEquity > 0 ? baseEquity : (backendSummary?.totalEquity ?? 0));
     
     // 6. Calculate total volume from trade history (using volume field which accounts for leverage)
     const computedVolume = history
