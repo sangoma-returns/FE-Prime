@@ -40,8 +40,6 @@ import { logger } from "./utils/logger";
 
 const AppContent: FC = () => {
   // Zustand Stores
-  const setExchanges = useMarketDataStore((s) => s.setExchanges);
-  const refreshAllAssets = useMarketDataStore((s) => s.refreshAllAssets);
   const hasDeposited = useAppStore((s) => s.hasDeposited);
   const hasBitfrostAccount = useAppStore(
     (s) => s.hasBitfrostAccount,
@@ -210,13 +208,13 @@ const AppContent: FC = () => {
         { id: 'bybit', name: 'Bybit', enabled: selectedExchanges.includes('Bybit') },
         { id: 'okx', name: 'OKX', enabled: selectedExchanges.includes('OKX') },
       ];
-      setExchanges(updatedExchanges);
+      useMarketDataStore.getState().setExchanges(updatedExchanges);
     }
-  }, [selectedExchanges, setExchanges]);
+  }, [selectedExchanges]);
 
   // Fetch initial market data on mount
   useEffect(() => {
-    refreshAllAssets();
+    useMarketDataStore.getState().refreshAllAssets();
   }, []);
 
   // Handlers
