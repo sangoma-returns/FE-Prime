@@ -46,7 +46,7 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const { history, clearAllTrades } = useTradesStore();
   const clearPositions = usePositionsStore((s) => s.clearPositions);
   const disconnectWallet = useAppStore((s) => s.disconnectWallet);
-  const { totalPnl: unrealizedPnl, totalPnlPercent } = useLivePositions();
+  const { positions: livePositions, totalPnl: unrealizedPnl } = useLivePositions();
   
   const isDark = currentTheme === 'dark';
   const [activeTab, setActiveTab] = useState<'overview' | 'exchanges' | 'history' | 'marketMaker'>('overview');
@@ -69,16 +69,57 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
       .filter(entry => entry.type === 'trade' && entry.pnl !== undefined)
       .reduce((sum, entry) => sum + (entry.pnl || 0), 0);
     
-    // Total equity = Deposit + Exchange Allocations + Realized PNL + Unrealized PNL
-    const totalEquity = depositAmount + exchangeEquity + realizedPnl + unrealizedPnl;
+    // Locked margin from live positions (positions store)
+    const liveLockedMargin = livePositions.reduce((sum, entry) => {
+      const legs = entry.position?.legs || [];
+      const legsMargin = legs.reduce((legSum, leg) => {
+        const notional = leg.quantity * leg.entryPrice;
+        const margin = leg.leverage > 0 ? notional / leg.leverage : notional;
+        return legSum + margin;
+      }, 0);
+      return sum + legsMargin;
+    }, 0);
+
+    // Base equity = vault + exchange allocations
+    const baseEquity = depositAmount + exchangeEquity;
+    // If no funding configured yet, fall back to locked margin so the UI isn't zero
+    const effectiveBaseEquity = baseEquity > 0 ? baseEquity : liveLockedMargin;
+
+    // Total equity = Base equity + Realized PNL + Unrealized PNL
+    const totalEquity = effectiveBaseEquity + realizedPnl + unrealizedPnl;
     
     return {
       totalEquity,
       exchangeEquity,
       realizedPnl,
       unrealizedPnl,
+      liveLockedMargin,
     };
-  }, [depositAmount, appStoreExchangeAllocations, history, unrealizedPnl]);
+  }, [depositAmount, appStoreExchangeAllocations, history, unrealizedPnl, livePositions]);
+
+  const directionalBiasPercent = useMemo(() => {
+    if (livePositions.length === 0) return 0;
+    const { longExposure, shortExposure } = livePositions.reduce(
+      (acc, entry) => {
+        const legs = entry.position?.legs || [];
+        legs.forEach((leg) => {
+          const notional = leg.quantity * leg.entryPrice * (leg.leverage || 1);
+          if (leg.side === 'long') {
+            acc.longExposure += notional;
+          } else {
+            acc.shortExposure += notional;
+          }
+        });
+        return acc;
+      },
+      { longExposure: 0, shortExposure: 0 }
+    );
+
+    const net = longExposure - shortExposure;
+    const totalEquity = backendSummary?.totalEquity ?? equityMetrics.totalEquity;
+    if (!totalEquity || totalEquity === 0) return 0;
+    return (net / totalEquity) * 100;
+  }, [livePositions, backendSummary, equityMetrics.totalEquity]);
 
   // Auto-switch to history tab when activeOrder is set
   useEffect(() => {
@@ -182,28 +223,28 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const stats = [
     { 
       label: 'Total Equity', 
-      value: hasAccount ? `$${(backendSummary?.totalEquity ?? equityMetrics.totalEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
-      change: hasAccount ? '+2.4%' : '0%',
-      isPositive: true,
+      value: `$${(backendSummary?.totalEquity ?? equityMetrics.totalEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      change: '+2.4%',
+      isPositive: (backendSummary?.totalEquity ?? equityMetrics.totalEquity) >= 0,
       icon: Wallet
     },
     { 
       label: 'PnL', 
-      value: hasAccount ? `${(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
+      value: `${(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: '24h',
-      isPositive: hasAccount ? ((backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? true : false) : null,
+      isPositive: (backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0,
       icon: TrendingUp
     },
     { 
       label: 'Unrealized PNL', 
-      value: hasAccount ? `${(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
+      value: `${(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: '24h',
-      isPositive: hasAccount ? ((backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? true : false) : null,
+      isPositive: (backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0,
       icon: BarChart3
     },
     { 
       label: 'Directional Bias', 
-      value: hasAccount ? `${(backendSummary?.directionalBiasPercent ?? 0).toFixed(2)}%` : '0%',
+      value: `${(backendSummary?.directionalBiasPercent ?? directionalBiasPercent).toFixed(2)}%`,
       change: 'Neutral',
       isPositive: null,
       icon: Scale
