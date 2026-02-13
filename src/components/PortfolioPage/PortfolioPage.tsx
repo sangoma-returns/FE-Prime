@@ -8,7 +8,11 @@ import { Wallet, TrendingUp, BarChart3, Scale } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAppStore } from '../../stores/appStore';
 import { useTradesStore } from '../../stores/tradesStore';
+import { usePositionsStore } from '../../stores/positionsStore';
 import { useLivePositions } from '../../hooks/useLivePositions';
+import { getPortfolioSummary, resetPortfolio } from '../../services/api/portfolio';
+import { clearSession } from '../../utils/sessionCache';
+import type { PortfolioSummary } from '../../types';
 
 interface Order {
   id: string;
@@ -39,7 +43,9 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const { theme: currentTheme, colors } = useThemeStore();
   const activeMarketMakerStrategies = useAppStore((s) => s.activeMarketMakerStrategies);
   const appStoreExchangeAllocations = useAppStore((s) => s.exchangeAllocations);
-  const { positions, history, getTotalPnL } = useTradesStore();
+  const { history, clearAllTrades } = useTradesStore();
+  const clearPositions = usePositionsStore((s) => s.clearPositions);
+  const disconnectWallet = useAppStore((s) => s.disconnectWallet);
   const { totalPnl: unrealizedPnl, totalPnlPercent } = useLivePositions();
   
   const isDark = currentTheme === 'dark';
@@ -47,6 +53,7 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const [expandedStrategy, setExpandedStrategy] = useState<string | null>(null);
   const [breakdownTab, setBreakdownTab] = useState<'venue' | 'asset' | 'strategyType'>('venue');
   const [selectedStrategy, setSelectedStrategy] = useState<{ id: string; name: string } | null>(null);
+  const [backendSummary, setBackendSummary] = useState<PortfolioSummary | null>(null);
 
   // Read URL parameters once on mount
   const [urlDetailTab, setUrlDetailTab] = useState<'status' | 'execution' | 'rebalancing' | null>(null);
@@ -79,6 +86,29 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
       setActiveTab('history');
     }
   }, [activeOrder]);
+
+  // Load backend portfolio summary and refresh periodically
+  useEffect(() => {
+    let isMounted = true;
+    const loadSummary = async () => {
+      try {
+        const summary = await getPortfolioSummary();
+        if (isMounted) {
+          setBackendSummary(summary);
+        }
+      } catch (error) {
+        // Backend is optional; ignore errors for demo mode
+      }
+    };
+
+    loadSummary();
+    const interval = setInterval(loadSummary, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Auto-switch tab if tab parameter is in URL - runs once on mount
   useEffect(() => {
@@ -127,31 +157,53 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     );
   }
 
+  const handleResetAccount = async () => {
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(
+        'This will reset your account state, clear trades/positions, and wipe the session cache. Continue?'
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      await resetPortfolio();
+    } catch {
+      // Backend reset is best-effort for demo mode
+    }
+
+    clearAllTrades();
+    clearPositions();
+    disconnectWallet();
+    clearSession();
+    setBackendSummary(null);
+    setActiveTab('overview');
+  };
+
   const stats = [
     { 
       label: 'Total Equity', 
-      value: hasAccount ? `$${equityMetrics.totalEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
+      value: hasAccount ? `$${(backendSummary?.totalEquity ?? equityMetrics.totalEquity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
       change: hasAccount ? '+2.4%' : '0%',
       isPositive: true,
       icon: Wallet
     },
     { 
       label: 'PnL', 
-      value: hasAccount ? `${equityMetrics.realizedPnl >= 0 ? '+' : ''}$${Math.abs(equityMetrics.realizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
+      value: hasAccount ? `${(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
       change: '24h',
-      isPositive: hasAccount ? (equityMetrics.realizedPnl >= 0 ? true : false) : null,
+      isPositive: hasAccount ? ((backendSummary?.unrealizedPnL ?? equityMetrics.realizedPnl) >= 0 ? true : false) : null,
       icon: TrendingUp
     },
     { 
       label: 'Unrealized PNL', 
-      value: hasAccount ? `${equityMetrics.unrealizedPnl >= 0 ? '+' : ''}$${Math.abs(equityMetrics.unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
+      value: hasAccount ? `${(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? '+' : ''}$${Math.abs(backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00',
       change: '24h',
-      isPositive: hasAccount ? (equityMetrics.unrealizedPnl >= 0 ? true : false) : null,
+      isPositive: hasAccount ? ((backendSummary?.unrealizedPnL ?? equityMetrics.unrealizedPnl) >= 0 ? true : false) : null,
       icon: BarChart3
     },
     { 
       label: 'Directional Bias', 
-      value: '0%',
+      value: hasAccount ? `${(backendSummary?.directionalBiasPercent ?? 0).toFixed(2)}%` : '0%',
       change: 'Neutral',
       isPositive: null,
       icon: Scale
@@ -264,6 +316,12 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
                 >
                   Transfer
                 </button>
+                <button 
+                  onClick={handleResetAccount}
+                  className={`px-3 py-1.5 border border-red-400/70 text-red-600 rounded-sm text-label hover:bg-red-500/10 transition-colors`}
+                >
+                  Reset Account
+                </button>
               </div>
             </div>
 
@@ -364,7 +422,12 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
             </div>
 
             {/* Content */}
-            {activeTab === 'overview' && <PortfolioOverview depositAmount={depositAmount} />}
+            {activeTab === 'overview' && (
+              <PortfolioOverview
+                depositAmount={depositAmount}
+                backendSummary={backendSummary}
+              />
+            )}
             {activeTab === 'exchanges' && <PortfolioExchanges exchangeAllocations={exchangeAllocations} depositAmount={equityMetrics.exchangeEquity} onConfigureAccounts={onConfigureAccounts} />}
             {activeTab === 'history' && <TradeHistory activeOrder={activeOrder} onClearActiveOrder={onClearActiveOrder} initialDetailTab={urlDetailTab || undefined} initialTradeType={urlTradeParam || undefined} />}
             {activeTab === 'marketMaker' && (

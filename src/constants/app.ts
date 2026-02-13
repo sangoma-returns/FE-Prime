@@ -59,7 +59,7 @@ export const VITE_NETWORK = import.meta.env.VITE_NETWORK || 'testnet';
 /**
  * API Base URL based on network
  */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.prime.testnet.bitfrost.ai';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * Supported blockchain networks

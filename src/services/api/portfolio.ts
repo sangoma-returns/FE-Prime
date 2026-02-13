@@ -10,7 +10,7 @@
  * - GET  /api/v1/portfolio/pnl - Profit & Loss data
  */
 
-import { get } from './client';
+import { get, post } from './client';
 import type { PortfolioSummary, ExchangeBalance, Position } from '../../types';
 
 // ============================================================================
@@ -31,6 +31,14 @@ import type { PortfolioSummary, ExchangeBalance, Position } from '../../types';
  */
 export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   return get<PortfolioSummary>('/api/v1/portfolio/summary');
+}
+
+export async function depositPortfolio(amountUsd: number): Promise<{ ok: boolean; cashUsd: number }> {
+  return post<{ ok: boolean; cashUsd: number }>('/api/v1/portfolio/deposit', { amountUsd });
+}
+
+export async function resetPortfolio(): Promise<{ ok: boolean }> {
+  return post<{ ok: boolean }>('/api/v1/portfolio/reset');
 }
 
 // ============================================================================

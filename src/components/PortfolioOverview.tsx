@@ -8,9 +8,16 @@ import { theme } from '../utils/cn';
 
 interface PortfolioOverviewProps {
   depositAmount?: number;
+  backendSummary?: {
+    totalEquity?: number;
+    lockedMargin?: number;
+    totalVolume?: number;
+    cashUsd?: number;
+    unrealizedPnL?: number;
+  } | null;
 }
 
-export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOverviewProps) {
+export default function PortfolioOverview({ depositAmount = 0, backendSummary = null }: PortfolioOverviewProps) {
   const { theme: currentTheme, colors } = useThemeStore();
   const { positions, history } = useTradesStore();
   const { exchangeAllocations, selectedExchanges, activeMarketMakerStrategies } = useAppStore();
@@ -27,7 +34,7 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
   // Calculate equity distribution
   const equityStats = useMemo(() => {
     // 1. Unlocked vault equity (depositAmount in vault)
-    const unlockedVaultEquity = depositAmount;
+    const unlockedVaultEquity = backendSummary?.cashUsd ?? depositAmount;
     
     // 2. Exchange equity (total funds allocated to exchanges)
     const exchangeEquity = Object.values(exchangeAllocations).reduce((sum, amount) => sum + amount, 0);
@@ -45,7 +52,7 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
       return sum + strategy.margin;
     }, 0);
     
-    const lockedMarginEquity = positionsMargin + marketMakerMargin;
+    const lockedMarginEquity = backendSummary?.lockedMargin ?? (positionsMargin + marketMakerMargin);
     
     // 4. Unlocked margin equity (amount in exchanges that is not currently in a position)
     const unlockedMarginEquity = Math.max(0, exchangeEquity - lockedMarginEquity);
@@ -54,10 +61,10 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
     const oldPnL = openPositions.reduce((sum, position) => sum + (position.pnl || 0), 0);
     const livePnL = totalPnl; // From useLivePositions hook
     const combinedPnL = oldPnL + livePnL;
-    const totalEquity = unlockedVaultEquity + exchangeEquity + combinedPnL;
+    const totalEquity = backendSummary?.totalEquity ?? (unlockedVaultEquity + exchangeEquity + combinedPnL);
     
     // 6. Calculate total volume from trade history (using volume field which accounts for leverage)
-    const totalVolume = history
+    const totalVolume = backendSummary?.totalVolume ?? history
       .filter(entry => entry.type === 'trade')
       .reduce((sum, entry) => sum + (entry.volume || 0), 0);
     
@@ -68,9 +75,9 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
       lockedMarginEquity,
       unlockedMarginEquity,
       totalVolume,
-      totalPnL: combinedPnL,
+      totalPnL: backendSummary?.unrealizedPnL ?? combinedPnL,
     };
-  }, [depositAmount, exchangeAllocations, openPositions, activeMarketMakerStrategies, history, totalPnl]);
+  }, [depositAmount, exchangeAllocations, openPositions, activeMarketMakerStrategies, history, totalPnl, backendSummary]);
 
   // Calculate exchange distribution for selected exchanges only
   const exchangeDistribution = useMemo(() => {

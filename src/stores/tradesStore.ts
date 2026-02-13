@@ -81,6 +81,7 @@ interface TradesState {
   addHistoryEntry: (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => void;
   getTotalPnL: () => number;
   getPositionsByExchange: (exchange: string) => Trade[];
+  clearAllTrades: () => void;
 }
 
 const generateId = () => {
@@ -275,5 +276,13 @@ export const useTradesStore = create<TradesState>((set, get) => ({
 
   getPositionsByExchange: (exchange) => {
     return get().positions.filter((p) => p.exchange === exchange && p.status === 'open');
+  },
+  
+  clearAllTrades: () => {
+    set(() => ({
+      positions: [],
+      openOrders: [],
+      history: [],
+    }));
   },
 }));

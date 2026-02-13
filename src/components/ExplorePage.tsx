@@ -57,7 +57,7 @@ export default function ExplorePage({
   // Use exchanges from market data store
   const EXCHANGES = marketExchanges.map(ex => ({ id: ex.id, name: ex.name }));
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeframe, setTimeframe] = useState('Day');
+  const [timeframe, setTimeframe] = useState('Year');
   const [watchlistSearch, setWatchlistSearch] = useState('');
   const [sortBy, setSortBy] = useState<'volume' | 'price'>('volume');
   const [selectedCells, setSelectedCells] = useState<SelectedCell[]>([]);

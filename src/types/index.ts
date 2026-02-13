@@ -36,6 +36,10 @@ export interface PortfolioSummary {
   unrealizedPnL: number;
   unrealizedPnLPercent: number;
   currency: 'USD' | 'USDC' | 'USDT';
+  lockedMargin?: number;
+  totalVolume?: number;
+  feesPaid?: number;
+  cashUsd?: number;
 }
 
 export interface ExchangeBalance {

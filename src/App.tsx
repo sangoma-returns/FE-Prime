@@ -27,6 +27,9 @@ import { useOrderManagement } from "./hooks/useOrderManagement";
 import { useTradeSelection } from "./hooks/useTradeSelection";
 import { usePnlTracking } from "./hooks/usePnlTracking";
 import { useFundingRateStorage } from "./hooks/useFundingRateStorage";
+import { depositPortfolio } from "./services/api/portfolio";
+import { useAuthStore } from "./stores/authStore";
+import { loadSession, saveSession, clearSession } from "./utils/sessionCache";
 
 // Types & Config
 import type { CreateOrderRequest } from "./types";
@@ -55,6 +58,14 @@ const AppContent: FC = () => {
   const exchangeAllocations = useAppStore(
     (s) => s.exchangeAllocations,
   );
+  const activeMarketMakerStrategies = useAppStore(
+    (s) => s.activeMarketMakerStrategies,
+  );
+  const tradeHistory = useAppStore((s) => s.tradeHistory);
+  const openOrders = useAppStore((s) => s.openOrders);
+  const transactionHistory = useAppStore((s) => s.transactionHistory);
+  const tokenBalances = useAppStore((s) => s.tokenBalances);
+  const totalVolume24h = useAppStore((s) => s.totalVolume24h);
   const disconnectWallet = useAppStore(
     (s) => s.disconnectWallet,
   );
@@ -70,7 +81,12 @@ const AppContent: FC = () => {
   );
   const transferFunds = useAppStore((s) => s.transferFunds);
 
-  const { isConnected, address, disconnect } = useMockWallet();
+  const { isConnected, address, disconnect, connect } = useMockWallet();
+  const authState = useAuthStore((s) => ({
+    isAuthenticated: s.isAuthenticated,
+    user: s.user,
+    status: s.status,
+  }));
 
   // Custom Hooks
   const { currentPage, navigateTo } = useNavigation();
@@ -105,6 +121,83 @@ const AppContent: FC = () => {
     }
   }, [isConnected, disconnectWallet]);
 
+  // Restore session cache (24-hour TTL)
+  useEffect(() => {
+    const cached = loadSession();
+    if (!cached) return;
+
+    if (cached.walletConnected && !isConnected) {
+      connect();
+    }
+
+    if (cached.authState) {
+      useAuthStore.setState({
+        ...cached.authState,
+        isLoading: false,
+      });
+    }
+
+    if (cached.appState) {
+      useAppStore.setState({
+        ...cached.appState,
+      });
+    }
+  }, []);
+
+  // Persist session cache on state changes
+  useEffect(() => {
+    const state = useAppStore.getState();
+    const appState = {
+      hasDeposited: state.hasDeposited,
+      hasBitfrostAccount: state.hasBitfrostAccount,
+      depositAmount: state.depositAmount,
+      selectedExchanges: state.selectedExchanges,
+      exchangeAllocations: state.exchangeAllocations,
+      activeOrder: state.activeOrder,
+      preselectedTrade: state.preselectedTrade,
+      activeMarketMakerStrategies: state.activeMarketMakerStrategies,
+      tradeHistory: state.tradeHistory,
+      openOrders: state.openOrders,
+      transactionHistory: state.transactionHistory,
+      tokenBalances: state.tokenBalances,
+      totalVolume24h: state.totalVolume24h,
+    };
+
+    const authSnapshot = {
+      isAuthenticated: authState.isAuthenticated,
+      user: authState.user,
+      status: authState.status,
+    };
+
+    const timeout = setTimeout(() => {
+      saveSession({
+        appState,
+        authState: authSnapshot,
+        walletConnected: isConnected,
+      });
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [
+    hasDeposited,
+    hasBitfrostAccount,
+    depositAmount,
+    selectedExchanges,
+    exchangeAllocations,
+    activeOrder,
+    preselectedTrade,
+    activeMarketMakerStrategies,
+    tradeHistory,
+    openOrders,
+    transactionHistory,
+    tokenBalances,
+    totalVolume24h,
+    isConnected,
+    authState.isAuthenticated,
+    authState.user,
+    authState.status,
+  ]);
+
   // Sync enabled exchanges with market data store
   useEffect(() => {
     if (selectedExchanges.length > 0) {
@@ -130,6 +223,7 @@ const AppContent: FC = () => {
     try {
       disconnect();
       disconnectWallet();
+      clearSession();
       logger.info("User disconnected wallet");
     } catch (error) {
       logger.error("Error during disconnect:", error);
@@ -140,7 +234,12 @@ const AppContent: FC = () => {
     logger.info("Wallet connected");
   };
 
-  const handleDeposit = (amount: number) => {
+  const handleDeposit = async (amount: number) => {
+    try {
+      await depositPortfolio(amount);
+    } catch (error) {
+      logger.warn("Backend deposit tracking failed", error);
+    }
     // If user has already deposited before, skip exchange selection
     if (hasDeposited) {
       // Just update the deposit amount and close the modal

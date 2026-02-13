@@ -15,6 +15,7 @@ import TradeHistory from './TradeHistory';
 import { OrdersSection } from './AggregatorPageOrders';
 import { Tooltip } from './Tooltip';
 import { fetchCurrentPrice, subscribeToPrice, subscribeToOrderBook, fetch24hTicker, type OrderBook } from '../services/priceService';
+import { createTrade } from '../services/api/trades';
 import { usePositionsStore } from '../stores/positionsStore';
 import { useFundingRatesStore } from '../stores/fundingRatesStore';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
@@ -2182,7 +2183,7 @@ export function AggregatorPage({
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowConfirmationModal(false);
                   
                   const now = new Date();
@@ -2272,6 +2273,20 @@ export function AggregatorPage({
                     historyEntry
                   });
                   addHistoryEntry(historyEntry);
+
+                  // Persist trade to backend for portfolio metrics
+                  try {
+                    await createTrade({
+                      symbol: selectedAsset,
+                      side: orderSide,
+                      notionalUsd: usdcNotional,
+                      leverage: leverage,
+                      entryPrice: price,
+                    });
+                  } catch (error) {
+                    // Backend is optional; ignore failures to keep UI responsive
+                    console.warn('Backend trade tracking failed:', error);
+                  }
                   
                   // === CREATE POSITION WITH LIVE DATA ===
                   // Check if this is an arbitrage trade (two exchanges selected)
