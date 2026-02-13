@@ -72,6 +72,7 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     const safeOldPnL = Number.isFinite(oldPnL) ? oldPnL : 0;
     const safeLivePnL = Number.isFinite(livePnL) ? livePnL : 0;
     const combinedPnL = safeOldPnL + safeLivePnL;
+    const baseEquity = unlockedVaultEquity + exchangeEquity;
     const computedTotalEquity = baseEquity + combinedPnL;
     const safeComputedTotalEquity = Number.isFinite(computedTotalEquity) ? computedTotalEquity : 0;
     const totalEquity =
@@ -83,7 +84,6 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     const computedVolume = history
       .filter(entry => entry.type === 'trade')
       .reduce((sum, entry) => sum + (entry.volume || 0), 0);
-    const baseEquity = unlockedVaultEquity + exchangeEquity;
     const totalVolume =
       computedVolume > 0
         ? computedVolume
