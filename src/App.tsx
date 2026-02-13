@@ -5,7 +5,7 @@
  * Updated: Navigation and Portfolio fixes
  */
 
-import { FC, useEffect } from "react";
+import { FC, useEffect, useRef } from "react";
 import { Toaster } from "./components/ui/sonner";
 import { MockWalletProvider, useMockWallet } from "./contexts/MockWalletContext";
 
@@ -115,10 +115,12 @@ const AppContent: FC = () => {
   // useFundingRateStorage();
 
   // Effects
+  const wasConnectedRef = useRef(isConnected);
   useEffect(() => {
-    if (!isConnected) {
+    if (wasConnectedRef.current && !isConnected) {
       disconnectWallet();
     }
+    wasConnectedRef.current = isConnected;
   }, [isConnected, disconnectWallet]);
 
   // Restore session cache (24-hour TTL)
