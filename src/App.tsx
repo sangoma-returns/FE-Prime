@@ -79,11 +79,9 @@ const AppContent: FC = () => {
   const transferFunds = useAppStore((s) => s.transferFunds);
 
   const { isConnected, address, disconnect, connect } = useMockWallet();
-  const authState = useAuthStore((s) => ({
-    isAuthenticated: s.isAuthenticated,
-    user: s.user,
-    status: s.status,
-  }));
+  const authIsAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const authUser = useAuthStore((s) => s.user);
+  const authStatus = useAuthStore((s) => s.status);
 
   // Custom Hooks
   const { currentPage, navigateTo } = useNavigation();
@@ -163,9 +161,9 @@ const AppContent: FC = () => {
     };
 
     const authSnapshot = {
-      isAuthenticated: authState.isAuthenticated,
-      user: authState.user,
-      status: authState.status,
+      isAuthenticated: authIsAuthenticated,
+      user: authUser,
+      status: authStatus,
     };
 
     const timeout = setTimeout(() => {
@@ -192,9 +190,9 @@ const AppContent: FC = () => {
     tokenBalances,
     totalVolume24h,
     isConnected,
-    authState.isAuthenticated,
-    authState.user,
-    authState.status,
+    authIsAuthenticated,
+    authUser,
+    authStatus,
   ]);
 
   // Sync enabled exchanges with market data store
