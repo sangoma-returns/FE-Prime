@@ -165,8 +165,8 @@ export default function ExplorePage({
       // Use live data from market data store
       return {
         price: asset.marketData.price,
-        // volume24h is already USD (see fetch24hTicker), so just convert to billions
-        volume: asset.marketData.volume24h / 1000000000,
+        // volume24h is already USD from the market data store
+        volume: asset.marketData.volume24h / 1000000000, // Convert to billions
         change: asset.marketData.priceChangePercent24h
       };
     }

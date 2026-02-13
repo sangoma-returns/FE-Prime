@@ -1,37 +1,5 @@
 @import "tailwindcss";
 
-@theme {
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --radius: var(--radius);
-}
-
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -75,32 +43,6 @@
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --font-weight-semibold: 600;
-
-  /* Component tokens (shadcn/ui) */
-  --card: #FFFFFF;
-  --card-foreground: #1C1C1C;
-  --popover: #FFFFFF;
-  --popover-foreground: #1C1C1C;
-  --primary: #C9A36A;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F1EEE6;
-  --secondary-foreground: #1C1C1C;
-  --muted: #F1EEE6;
-  --muted-foreground: #6B6B6B;
-  --accent: #F1EEE6;
-  --accent-foreground: #1C1C1C;
-  --destructive: #E24A4A;
-  --destructive-foreground: #FFFFFF;
-  --input: rgba(0, 0, 0, 0.08);
-  --ring: var(--focus-color);
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #1C1C1C;
-  --sidebar-primary: #C9A36A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F1EEE6;
-  --sidebar-accent-foreground: #1C1C1C;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-ring: #C9A36A;
 }
 
 .dark {

@@ -58,7 +58,7 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     const exchangeEquity = Object.values(appStoreExchangeAllocations).reduce((sum, amount) => sum + amount, 0);
     
     // Get realized PNL (from closed positions in history)
-    const realizedPnl = (history || [])
+    const realizedPnl = history
       .filter(entry => entry.type === 'trade' && entry.pnl !== undefined)
       .reduce((sum, entry) => sum + (entry.pnl || 0), 0);
     

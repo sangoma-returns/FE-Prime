@@ -34,8 +34,7 @@ const assetToBinanceSymbol = (asset: string): string => {
   
   // Symbol mappings for assets that have different names on Binance
   const symbolMap: Record<string, string> = {
-    'MATIC': 'POLUSDT', // Polygon migrated from MATIC to POL
-    'POL': 'POLUSDT',   // Polygon's new token symbol
+    'MATIC': 'MATICUSDT', // Polygon - some exchanges still use MATIC
     // Add more mappings here if needed
   };
   
@@ -271,25 +270,13 @@ export async function fetch24hTicker(asset: string = 'BTC:PERP-USD'): Promise<{
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
       },
-      signal: AbortSignal.timeout(10000), // 10 second timeout on client side
     });
     
     if (!response.ok) {
-      // Handle timeout from backend (504)
-      if (response.status === 504) {
-        console.warn(`⏱️ Binance 24hr ticker request timed out for ${symbol}, using fallback data`);
-        throw new Error('Request timeout');
-      }
       throw new Error(`Proxy API error: ${response.status}`);
     }
     
     const data = await response.json();
-    
-    // Check if error response from backend
-    if (data.error) {
-      console.warn(`⚠️ Binance API error for ${symbol}: ${data.error}`);
-      throw new Error(data.error);
-    }
     
     // Parse price and volume
     const price = parseFloat(data.lastPrice);
@@ -307,23 +294,15 @@ export async function fetch24hTicker(asset: string = 'BTC:PERP-USD'): Promise<{
         headers: {
           'Authorization': `Bearer ${publicAnonKey}`,
         },
-        signal: AbortSignal.timeout(8000), // 8 second timeout for OI
       });
       
       if (oiResponse.ok) {
         const oiData = await oiResponse.json();
         // openInterest is in contract units, multiply by current price to get USD value
         openInterest = parseFloat(oiData.openInterest) * price;
-        console.log(`✅ Open Interest for ${symbol}: $${(openInterest / 1e9).toFixed(2)}B`);
-      } else if (oiResponse.status === 400) {
-        // 400 = No futures contract available (expected for some assets)
-        console.debug(`No futures OI data for ${symbol} (not available on Binance Futures)`);
-      } else {
-        console.warn(`⚠️ OI fetch failed for ${symbol}: ${oiResponse.status}`);
       }
       // Silently skip if no OI data available (expected for some assets)
     } catch (oiError) {
-      console.warn(`⚠️ OI fetch error for ${symbol}:`, oiError);
       // Silently skip OI fetch errors - not critical for app functionality
     }
     
@@ -345,7 +324,6 @@ export async function fetch24hTicker(asset: string = 'BTC:PERP-USD'): Promise<{
       high: 89500,
       low: 88800,
       volume: 28400000000,
-      openInterest: 45000000000, // Add fallback OI (~$45B for BTC)
     };
   }
 }

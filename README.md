@@ -1,7 +1,7 @@
 
-  # Funding Rate Arbitrage MVP RWAs
+  # Funding Rate Arbitrage MVP RWAs mine OG
 
-  This is a code bundle for Funding Rate Arbitrage MVP RWAs. The original project is available at https://www.figma.com/design/Bdar3QuAtxEb3HC5i3SssA/Funding-Rate-Arbitrage-MVP-RWAs.
+  This is a code bundle for Funding Rate Arbitrage MVP RWAs mine OG. The original project is available at https://www.figma.com/design/dAkWz4FD4zdMFXMTqiXKML/Funding-Rate-Arbitrage-MVP-RWAs-mine-OG.
 
   ## Running the code
 

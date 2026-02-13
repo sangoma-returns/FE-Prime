@@ -85,84 +85,64 @@ export default function ExchangeExecutionChart({ colors, exchanges }: ExchangeEx
   const xPositions = [40,80,120,160,200,240,280,320,360,400,440,480,520,560,600,640,680,720,760,800,840,880];
 
   return (
-    <div className="space-y-2">
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 px-1">
-        {validExchanges.map((exchange, idx) => (
-          <div key={exchange} className="flex items-center gap-1.5">
-            <div 
-              className="w-2 h-2 rounded-full" 
-              style={{ backgroundColor: EXCHANGE_COLORS[idx % EXCHANGE_COLORS.length] }}
-            />
-            <span className={`text-[10px] ${colors.text.secondary}`}>{exchange}</span>
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-[#3b82f6]" />
-          <span className={`text-[10px] ${colors.text.secondary}`}>Total</span>
-        </div>
-      </div>
-
-      {/* Chart */}
-      <svg width="100%" height="100%" viewBox="0 0 900 220" preserveAspectRatio="none">
-        {/* Y-axis */}
-        <line x1="40" y1="10" x2="40" y2="200" stroke="currentColor" strokeWidth="1" className={colors.text.tertiary} opacity="0.3" />
-        <line x1="40" y1="200" x2="880" y2="200" stroke="currentColor" strokeWidth="1" className={colors.text.tertiary} opacity="0.3" />
-        
-        {/* Grid lines */}
-        <line x1="40" y1="57" x2="880" y2="57" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
-        <line x1="40" y1="104" x2="880" y2="104" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
-        <line x1="40" y1="151" x2="880" y2="151" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
-        
-        {/* Y-axis labels */}
-        <text x="8" y="15" fill="currentColor" fontSize="9" className={colors.text.tertiary}>100%</text>
-        <text x="14" y="62" fill="currentColor" fontSize="9" className={colors.text.tertiary}>75%</text>
-        <text x="14" y="109" fill="currentColor" fontSize="9" className={colors.text.tertiary}>50%</text>
-        <text x="14" y="156" fill="currentColor" fontSize="9" className={colors.text.tertiary}>25%</text>
-        <text x="18" y="205" fill="currentColor" fontSize="9" className={colors.text.tertiary}>0%</text>
-        
-        {/* X-axis labels */}
-        <text x="150" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:46</text>
-        <text x="450" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:47</text>
-        <text x="740" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:48</text>
-        
-        {/* Exchange lines */}
-        {exchangeDataSets.map((dataSet, idx) => (
-          <path
-            key={`exchange-${idx}`}
-            d={`M ${xPositions[0]} ${dataSet[0]} ${xPositions.map((x, i) => `L ${x} ${dataSet[i]}`).join(' ')}`}
-            fill="none"
-            stroke={EXCHANGE_COLORS[idx % EXCHANGE_COLORS.length]}
-            strokeWidth="2"
-          />
-        ))}
-        
-        {/* Total line (blue) - thicker */}
+    <svg width="100%" height="100%" viewBox="0 0 900 220" preserveAspectRatio="none">
+      {/* Y-axis */}
+      <line x1="40" y1="10" x2="40" y2="200" stroke="currentColor" strokeWidth="1" className={colors.text.tertiary} opacity="0.3" />
+      <line x1="40" y1="200" x2="880" y2="200" stroke="currentColor" strokeWidth="1" className={colors.text.tertiary} opacity="0.3" />
+      
+      {/* Grid lines */}
+      <line x1="40" y1="57" x2="880" y2="57" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
+      <line x1="40" y1="104" x2="880" y2="104" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
+      <line x1="40" y1="151" x2="880" y2="151" stroke="currentColor" strokeWidth="0.5" className={colors.text.tertiary} opacity="0.1" strokeDasharray="2,2" />
+      
+      {/* Y-axis labels */}
+      <text x="8" y="15" fill="currentColor" fontSize="9" className={colors.text.tertiary}>100%</text>
+      <text x="14" y="62" fill="currentColor" fontSize="9" className={colors.text.tertiary}>75%</text>
+      <text x="14" y="109" fill="currentColor" fontSize="9" className={colors.text.tertiary}>50%</text>
+      <text x="14" y="156" fill="currentColor" fontSize="9" className={colors.text.tertiary}>25%</text>
+      <text x="18" y="205" fill="currentColor" fontSize="9" className={colors.text.tertiary}>0%</text>
+      
+      {/* X-axis labels */}
+      <text x="150" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:46</text>
+      <text x="450" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:47</text>
+      <text x="740" y="215" fill="currentColor" fontSize="9" className={colors.text.tertiary}>08:48</text>
+      
+      {/* Exchange lines */}
+      {exchangeDataSets.map((dataSet, idx) => (
         <path
-          d={`M ${xPositions[0]} ${totalData[0]} ${xPositions.map((x, i) => `L ${x} ${totalData[i]}`).join(' ')}`}
+          key={`exchange-${idx}`}
+          d={`M ${xPositions[0]} ${dataSet[0]} ${xPositions.map((x, i) => `L ${x} ${dataSet[i]}`).join(' ')}`}
           fill="none"
-          stroke="#3b82f6"
-          strokeWidth="2.5"
+          stroke={EXCHANGE_COLORS[idx % EXCHANGE_COLORS.length]}
+          strokeWidth="2"
         />
-        
-        {/* Dot markers */}
-        {xPositions.map((x, i) => (
-          <g key={i}>
-            {/* Exchange dots */}
-            {exchangeDataSets.map((dataSet, idx) => (
-              <circle 
-                key={`dot-${idx}`}
-                cx={x} 
-                cy={dataSet[i]} 
-                r="2.5" 
-                fill={EXCHANGE_COLORS[idx % EXCHANGE_COLORS.length]} 
-              />
-            ))}
-            {/* Total dot */}
-            <circle cx={x} cy={totalData[i]} r="3" fill="#3b82f6" />
-          </g>
-        ))}
-      </svg>
-    </div>
+      ))}
+      
+      {/* Total line (blue) - thicker */}
+      <path
+        d={`M ${xPositions[0]} ${totalData[0]} ${xPositions.map((x, i) => `L ${x} ${totalData[i]}`).join(' ')}`}
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth="2.5"
+      />
+      
+      {/* Dot markers */}
+      {xPositions.map((x, i) => (
+        <g key={i}>
+          {/* Exchange dots */}
+          {exchangeDataSets.map((dataSet, idx) => (
+            <circle 
+              key={`dot-${idx}`}
+              cx={x} 
+              cy={dataSet[i]} 
+              r="2.5" 
+              fill={EXCHANGE_COLORS[idx % EXCHANGE_COLORS.length]} 
+            />
+          ))}
+          {/* Total dot */}
+          <circle cx={x} cy={totalData[i]} r="3" fill="#3b82f6" />
+        </g>
+      ))}
+    </svg>
   );
 }

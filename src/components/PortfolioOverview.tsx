@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useThemeStore } from '../stores/themeStore';
-import { useTradesStore, usePnlData, usePositions as useNewPositions } from '../stores/tradesStore';
+import { useTradesStore } from '../stores/tradesStore';
 import { useAppStore } from '../stores/appStore';
 import { usePricesStore } from '../stores/pricesStore';
 import { useLivePositions } from '../hooks/useLivePositions';
@@ -12,34 +12,18 @@ interface PortfolioOverviewProps {
 
 export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOverviewProps) {
   const { theme: currentTheme, colors } = useThemeStore();
-  const { history } = useTradesStore();
-  const newPositionsMap = useNewPositions(); // New positions from tradesStore  
-  
-  // Use individual selectors to avoid creating new objects
-  const realizedPnl = useTradesStore((state) => state.cachedRealizedPnl);
-  const unrealizedPnl = useTradesStore((state) => state.cachedUnrealizedPnl);
-  const newTotalPnl = useTradesStore((state) => state.cachedTotalPnl);
-  const byStrategy = useTradesStore((state) => state.cachedPnlByStrategy);
-  
-  // Use individual selectors to avoid creating new objects
-  const exchangeAllocations = useAppStore((state) => state.exchangeAllocations);
-  const selectedExchanges = useAppStore((state) => state.selectedExchanges);
-  const activeMarketMakerStrategies = useAppStore((state) => state.activeMarketMakerStrategies);
-  
-  // Use individual selectors for prices store
-  const prices = usePricesStore((state) => state.prices);
-  const getPrice = usePricesStore((state) => state.getPrice);
-  
+  const { positions, history } = useTradesStore();
+  const { exchangeAllocations, selectedExchanges, activeMarketMakerStrategies } = useAppStore();
+  const { prices, getPrice } = usePricesStore();
   const isDark = currentTheme === 'dark';
   const [positionsTab, setPositionsTab] = useState<'positions' | 'openOrders' | 'twap' | 'tradeHistory' | 'fundingHistory' | 'orderHistory' | 'interest' | 'withdrawsDeposits'>('positions');
   
-  // Get live positions with real-time PNL (for backwards compatibility)
-  const { positions: livePositions, totalPnl: oldTotalPnl, totalPnlPercent } = useLivePositions();
+  // Get live positions with real-time PNL
+  const { positions: livePositions, totalPnl, totalPnlPercent } = useLivePositions();
   
-  // No more old positions array - all positions are in the new store
-  // Define as a constant to avoid creating new array on every render
-  const openPositions = useMemo(() => [], []);
-  
+  // Get only open positions from old store (for backwards compatibility)
+  const openPositions = positions.filter(p => p.status === 'open');
+
   // Calculate equity distribution
   const equityStats = useMemo(() => {
     // 1. Unlocked vault equity (depositAmount in vault)
@@ -66,11 +50,10 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
     // 4. Unlocked margin equity (amount in exchanges that is not currently in a position)
     const unlockedMarginEquity = Math.max(0, exchangeEquity - lockedMarginEquity);
     
-    // 5. Total equity (vault + exchanges + PnL from new trades store)
+    // 5. Total equity (vault + exchanges + PnL from old + live positions)
     const oldPnL = openPositions.reduce((sum, position) => sum + (position.pnl || 0), 0);
-    const livePnL = oldTotalPnl; // From useLivePositions hook (legacy)
-    const newPnL = newTotalPnl; // From new tradesStore
-    const combinedPnL = oldPnL + livePnL + newPnL; // Combine all PNL sources
+    const livePnL = totalPnl; // From useLivePositions hook
+    const combinedPnL = oldPnL + livePnL;
     const totalEquity = unlockedVaultEquity + exchangeEquity + combinedPnL;
     
     // 6. Calculate total volume from trade history (using volume field which accounts for leverage)
@@ -87,7 +70,7 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
       totalVolume,
       totalPnL: combinedPnL,
     };
-  }, [depositAmount, exchangeAllocations, openPositions, activeMarketMakerStrategies, history, oldTotalPnl, newTotalPnl]);
+  }, [depositAmount, exchangeAllocations, openPositions, activeMarketMakerStrategies, history, totalPnl]);
 
   // Calculate exchange distribution for selected exchanges only
   const exchangeDistribution = useMemo(() => {
@@ -211,11 +194,10 @@ export default function PortfolioOverview({ depositAmount = 0 }: PortfolioOvervi
               <span className={`${colors.text.tertiary} text-label`}>locked margin equity</span>
               <span className={`text-label ${colors.text.primary}`}>${equityStats.lockedMarginEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className={`flex justify-between py-2 border-b ${colors.border.secondary}`}>
+            <div className="flex justify-between py-2">
               <span className={`${colors.text.tertiary} text-label`}>unlocked margin equity</span>
               <span className={`text-label ${colors.text.primary}`}>${equityStats.unlockedMarginEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            {/* Removed duplicate PNL metrics - they're already shown in the top cards */}
           </div>
         </div>
 

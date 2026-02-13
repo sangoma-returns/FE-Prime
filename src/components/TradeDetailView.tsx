@@ -10,36 +10,8 @@ import ExchangeExecutionChart from './ExchangeExecutionChart';
 // Helper function to format pair names for display
 // Converts "xyz GOLD:PERP-USDC:PERP-USD" -> "xyz GOLD:PERP-USDC"
 // Converts "cash GOLD:PERP-USDC:PERP-USD" -> "cash GOLD:PERP-USDC"
-// For aggregator RWA trades: "xyz:SILVER:PERP-USD" -> "SILVER:PERP-USD" (strip DEX prefix)
-function formatPairName(pair: string | undefined, source?: string): string {
+function formatPairName(pair: string | undefined): string {
   if (!pair) return 'BTC PERP-USDT';
-  
-  console.log('🔍 formatPairName - Input:', { pair, source });
-  
-  // AGGREGATOR RWA TRADES: Strip DEX prefix for RWA assets
-  // "xyz:SILVER:PERP-USD" -> "SILVER PERP-USD"
-  // "flx:GOLD:PERP-USDC" -> "GOLD PERP-USD"
-  if (source === 'aggregator') {
-    const dexPrefixes = ['xyz', 'vntl', 'km', 'cash', 'flx', 'hyna'];
-    const parts = pair.split(':');
-    
-    console.log('🔍 formatPairName - Aggregator mode:', { parts, hasDexPrefix: dexPrefixes.includes(parts[0].toLowerCase()) });
-    
-    if (parts.length >= 2 && dexPrefixes.includes(parts[0].toLowerCase())) {
-      // Has DEX prefix - remove it
-      const withoutPrefix = parts.slice(1).join(':'); // "SILVER:PERP-USD"
-      
-      // Format for display: "SILVER PERP-USD"
-      const formatted = withoutPrefix.replace(':', ' ').replace('-PERP', ' PERP').replace('-USDC', '-USD');
-      console.log('🔍 formatPairName - Output:', formatted);
-      return formatted;
-    }
-    
-    // No DEX prefix or crypto asset - format normally
-    const formatted = pair.replace(':', ' ').replace('-PERP', ' PERP');
-    console.log('🔍 formatPairName - Output (no DEX prefix):', formatted);
-    return formatted;
-  }
   
   // Handle complex HIP-3 RWA format: "xyz GOLD:PERP-USDC:PERP-USD" -> "xyz GOLD:PERP-USDC"
   // Just remove the last ":PERP-USD" suffix if it exists
@@ -77,8 +49,6 @@ interface Trade {
   buyPrice?: number; // Entry price for buy leg
   sellPrice?: number; // Entry price for sell leg
   duration?: number;
-  source?: string; // 'aggregator' | 'trade' | etc.
-  exchanges?: string[]; // Selected exchanges for aggregator trades
   exchanges?: string[];
 }
 
@@ -132,14 +102,14 @@ export default function TradeDetailView({ trade, onBack, initialTab = 'execution
             <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-white"></div>
             </div>
-            <span className={`text-[10px] font-medium ${colors.text.primary}`}>{formatPairName(trade.buyPair || trade.pair, trade.source)}</span>
+            <span className={`text-[10px] font-medium ${colors.text.primary}`}>{formatPairName(trade.buyPair || trade.pair)}</span>
           </div>
           {trade.side === 'Multi' && (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
                 <div className="w-2 h-2 rounded-full bg-white"></div>
               </div>
-              <span className={`text-[10px] font-medium ${colors.text.primary}`}>{formatPairName(trade.sellPair, trade.source)}</span>
+              <span className={`text-[10px] font-medium ${colors.text.primary}`}>{formatPairName(trade.sellPair)}</span>
             </div>
           )}
         </div>
@@ -404,16 +374,11 @@ function StatusTab({ colors, trade }: { colors: any; trade: Trade }) {
                   <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
                     <div className="w-2 h-2 rounded-full bg-white"></div>
                   </div>
-                  {formatPairName(trade.buyPair || trade.pair, trade.source)}
+                  {formatPairName(trade.buyPair || trade.pair)}
                 </div>
               </td>
               <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
-                {trade.source === 'aggregator' && trade.exchanges && trade.exchanges.length > 0 ? (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    {trade.exchanges.length} {trade.exchanges.length === 1 ? 'exchange' : 'exchanges'}
-                  </div>
-                ) : trade.side === 'Single' ? (
+                {trade.side === 'Single' ? (
                   <div className="flex items-center gap-1">
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
                     2 exchanges
@@ -443,7 +408,7 @@ function StatusTab({ colors, trade }: { colors: any; trade: Trade }) {
                     <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
                       <div className="w-2 h-2 rounded-full bg-white"></div>
                     </div>
-                    {formatPairName(trade.sellPair, trade.source)}
+                    {formatPairName(trade.sellPair)}
                   </div>
                 </td>
                 <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
@@ -598,59 +563,6 @@ function StatusTab({ colors, trade }: { colors: any; trade: Trade }) {
 }
 
 function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade: Trade; selectedExchanges: string[] }) {
-  // Generate mock clip data with varying prices to calculate average executed price
-  const generateClipData = (basePrice: number, quantity: number, numClips: number = 5) => {
-    const clips = [];
-    let remainingQuantity = quantity;
-    
-    for (let i = 0; i < numClips; i++) {
-      const isLast = i === numClips - 1;
-      const clipQuantity = isLast ? remainingQuantity : quantity / numClips;
-      
-      // Vary price slightly around base price (+/- 0.5%)
-      const priceVariation = (Math.random() - 0.5) * 0.01 * basePrice;
-      const clipPrice = basePrice + priceVariation;
-      
-      clips.push({
-        quantity: clipQuantity,
-        price: clipPrice,
-        notional: clipQuantity * clipPrice
-      });
-      
-      remainingQuantity -= clipQuantity;
-    }
-    
-    return clips;
-  };
-  
-  // Calculate average executed price (weighted by quantity)
-  const calculateAvgPrice = (clips: Array<{ quantity: number; price: number; notional: number }>) => {
-    const totalNotional = clips.reduce((sum, clip) => sum + clip.notional, 0);
-    const totalQuantity = clips.reduce((sum, clip) => sum + clip.quantity, 0);
-    return totalQuantity > 0 ? totalNotional / totalQuantity : 0;
-  };
-  
-  // Generate clips for buy and sell sides
-  const buyClips = trade.buyPrice && trade.buyQuantity 
-    ? generateClipData(trade.buyPrice, trade.buyQuantity, 5)
-    : [];
-  const sellClips = trade.sellPrice && trade.sellQuantity 
-    ? generateClipData(trade.sellPrice, trade.sellQuantity, 5)
-    : [];
-    
-  // Calculate average prices
-  const avgBuyPrice = buyClips.length > 0 ? calculateAvgPrice(buyClips) : (trade.buyPrice || 0);
-  const avgSellPrice = sellClips.length > 0 ? calculateAvgPrice(sellClips) : (trade.sellPrice || 0);
-  
-  console.log('📊 ExecutionTab - Average Prices:', { 
-    buyClips: buyClips.length, 
-    avgBuyPrice, 
-    originalBuyPrice: trade.buyPrice,
-    sellClips: sellClips.length,
-    avgSellPrice,
-    originalSellPrice: trade.sellPrice
-  });
-  
   return (
     <div className="space-y-3">
       {/* Pairs Table */}
@@ -675,16 +587,11 @@ function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade
                   <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
                     <div className="w-2 h-2 rounded-full bg-white"></div>
                   </div>
-                  {formatPairName(trade.buyPair || trade.pair, trade.source)}
+                  {formatPairName(trade.buyPair || trade.pair)}
                 </div>
               </td>
               <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
-                {trade.source === 'aggregator' && trade.exchanges && trade.exchanges.length > 0 ? (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    {trade.exchanges.length} {trade.exchanges.length === 1 ? 'exchange' : 'exchanges'}
-                  </div>
-                ) : trade.side === 'Single' ? (
+                {trade.side === 'Single' ? (
                   <div className="flex items-center gap-1">
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
                     2 exchanges
@@ -695,7 +602,7 @@ function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade
               <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
                 <div>{formatTargetNotional(trade.buyLeverage || 1, trade.buyQuantity || 0)}</div>
               </td>
-              <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>${avgBuyPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>${(trade.buyPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>{calculateTotalNotional(trade.buyQuantity || 0, trade.buyLeverage || 1)}</td>
               <td className="px-2.5 py-2">
                 <div className="flex items-center gap-1.5">
@@ -714,7 +621,7 @@ function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade
                     <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
                       <div className="w-2 h-2 rounded-full bg-white"></div>
                     </div>
-                    {formatPairName(trade.sellPair, trade.source)}
+                    {formatPairName(trade.sellPair)}
                   </div>
                 </td>
                 <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
@@ -724,7 +631,7 @@ function ExecutionTab({ colors, trade, selectedExchanges }: { colors: any; trade
                 <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>
                   <div>{formatTargetNotional(trade.sellLeverage || 1, trade.sellQuantity || 0)}</div>
                 </td>
-                <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>${avgSellPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>${(trade.sellPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className={`px-2.5 py-2 text-[10px] ${colors.text.secondary}`}>{calculateTotalNotional(trade.sellQuantity || 0, trade.sellLeverage || 1)}</td>
                 <td className="px-2.5 py-2">
                   <div className="flex items-center gap-1.5">

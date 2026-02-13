@@ -113,9 +113,8 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
 
   // Calculate account equity metrics from global state
   const equityMetrics = useMemo(() => {
-    // Get only open positions (old store) - ensure positions is an array
-    const positionsArray = Array.isArray(positions) ? positions : [];
-    const openPositions = positionsArray.filter(p => p.status === 'open');
+    // Get only open positions (old store)
+    const openPositions = positions.filter(p => p.status === 'open');
     
     // 1. Unlocked vault equity (depositAmount in vault)
     const unlockedVaultEquity = depositAmount;
@@ -692,37 +691,8 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
             const sellLev = parseFloat(sellLeverage) || 1;
             
             // Get actual prices from pricesStore
-            let buyPrice = getPrice(buyToken) || 0;
-            let sellPrice = getPrice(sellToken) || 0;
-            
-            // CRITICAL FIX: If prices are 0, use fallback default prices
-            // This ensures trades always have valid prices for PNL calculation
-            if (buyPrice === 0 || sellPrice === 0) {
-              const DEFAULT_PRICES: Record<string, number> = {
-                'BTC': 89128,
-                'ETH': 3245,
-                'SOL': 142,
-                'GOLD': 4900,
-                'SILVER': 32,
-                'COPPER': 4.5,
-                'OIL': 75,
-              };
-              
-              const originalBuyPrice = buyPrice;
-              const originalSellPrice = sellPrice;
-              
-              buyPrice = buyPrice || DEFAULT_PRICES[buyToken] || 0;
-              sellPrice = sellPrice || DEFAULT_PRICES[sellToken] || 0;
-              
-              console.warn('⚠️ Missing price data for trade execution - using fallback:', {
-                buyToken,
-                originalBuyPrice,
-                fallbackBuyPrice: buyPrice,
-                sellToken,
-                originalSellPrice,
-                fallbackSellPrice: sellPrice,
-              });
-            }
+            const buyPrice = getPrice(buyToken) || 0;
+            const sellPrice = getPrice(sellToken) || 0;
             
             console.log('💰 Captured execution prices:', {
               buyToken,
@@ -740,37 +710,12 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
             // Add volume to global state
             useAppStore.getState().addVolume(totalVolume);
             
-            // Record carry trade executions in new trades store
-            // Long leg
-            addTrade({
-              exchange: selectedBuyAccount,
-              symbol: selectedBuyPair,
-              side: 'buy',
-              size: buyAmount,
-              executionPrice: buyPrice,
-              tradingMode: 'carry',
-              orderType: 'market',
-              notes: `Carry trade long leg (${buyLev}x leverage)`,
-            });
-            
-            // Short leg
-            addTrade({
-              exchange: selectedSellAccount,
-              symbol: selectedSellPair,
-              side: 'sell',
-              size: sellAmount,
-              executionPrice: sellPrice,
-              tradingMode: 'carry',
-              orderType: 'market',
-              notes: `Carry trade short leg (${sellLev}x leverage)`,
-            });
-            
-            // Add ONE combined carry trade order to global trades store (for compatibility)
+            // Add ONE combined carry trade order to global trades store
             addOrder({
               type: 'carry',
-              exchange: `${selectedBuyAccount} / ${selectedSellAccount}`,
-              token: buyToken,
-              size: buyAmount,
+              exchange: `${selectedBuyAccount} / ${selectedSellAccount}`, // Combined display
+              token: buyToken, // Primary token for display
+              size: buyAmount, // Primary size for display
               price: buyPrice,
               status: 'pending',
               source: 'carry',
@@ -783,6 +728,30 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
                 shortSize: sellAmount,
               },
             });
+            
+            // Add long position (skip auto-history)
+            addTrade({
+              type: 'long',
+              exchange: selectedBuyAccount,
+              token: buyToken,
+              size: buyAmount,
+              entryPrice: buyPrice,
+              source: 'carry',
+              fundingRate: 0.01,
+              leverage: buyLev,
+            }, true);
+            
+            // Add short position (skip auto-history)
+            addTrade({
+              type: 'short',
+              exchange: selectedSellAccount,
+              token: sellToken,
+              size: sellAmount,
+              entryPrice: sellPrice,
+              source: 'carry',
+              fundingRate: -0.01,
+              leverage: sellLev,
+            }, true);
             
             // Add a single "Multi" history entry for the carry trade
             addHistoryEntry({

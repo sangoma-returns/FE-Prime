@@ -72,7 +72,7 @@ const TOP_ASSETS = [
   { symbol: 'DOGE', name: 'Dogecoin', binanceSymbol: 'DOGEUSDT' },
   { symbol: 'AVAX', name: 'Avalanche', binanceSymbol: 'AVAXUSDT' },
   { symbol: 'DOT', name: 'Polkadot', binanceSymbol: 'DOTUSDT' },
-  { symbol: 'POL', name: 'Polygon', binanceSymbol: 'POLUSDT' }, // Updated from MATIC to POL (Polygon's new token)
+  { symbol: 'MATIC', name: 'Polygon', binanceSymbol: 'MATICUSDT' },
   { symbol: 'LINK', name: 'Chainlink', binanceSymbol: 'LINKUSDT' },
   { symbol: 'UNI', name: 'Uniswap', binanceSymbol: 'UNIUSDT' },
   { symbol: 'ATOM', name: 'Cosmos', binanceSymbol: 'ATOMUSDT' },
@@ -147,8 +147,7 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
         },
       });
     } catch (error) {
-      // Silently use fallback data - timeout errors are handled gracefully
-      console.debug(`Using fallback data for ${symbol} due to:`, error);
+      console.error(`Failed to refresh asset data for ${symbol}:`, error);
     }
   },
   

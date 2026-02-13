@@ -19,7 +19,6 @@ import { usePositionsStore } from '../stores/positionsStore';
 import { useFundingRatesStore } from '../stores/fundingRatesStore';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { fetchAllDexsRWAData, fetchSingleDexRWAData } from './AggregatorPageFetchHelper';
-import { fetchSingleDexRWADataFast } from './AggregatorPageFetchHelperOptimized';
 import { 
   fetchPerpDexs, 
   getMarketMetrics, 
@@ -69,7 +68,7 @@ export function AggregatorPage({
 }: AggregatorPageProps) {
   const { colors, theme } = useThemeStore();
   const { addTradeToHistory, addOpenOrder } = useAppStore();
-  const { addTrade, addOrder, addHistoryEntry, updatePositions } = useTradesStore();
+  const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
   const { prices, getPrice, updatePrice } = usePricesStore();
   const { exchanges, assets, refreshAssetData, getAsset } = useMarketDataStore();
   const { addPosition } = usePositionsStore();
@@ -86,7 +85,6 @@ export function AggregatorPage({
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [exchangesDropdownOpen, setExchangesDropdownOpen] = useState(false);
   const [selectedExchanges, setSelectedExchanges] = useState<string[]>([]);
-  const [exchangeType, setExchangeType] = useState<'crypto' | 'rwa'>('crypto'); // Toggle between crypto exchanges and RWA DEXs
   const [strategiesDropdownOpen, setStrategiesDropdownOpen] = useState(false);
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>(['Impact Minimization']);
   const [assetDropdownOpen, setAssetDropdownOpen] = useState(false);
@@ -123,8 +121,7 @@ export function AggregatorPage({
   // Form input states
   const [btcAmount, setBtcAmount] = useState('');
   const [usdtAmount, setUsdtAmount] = useState('');
-  const isBtcAmountLocked = usdtAmount.trim().length > 0;
-  const isUsdtAmountLocked = btcAmount.trim().length > 0;
+  const [leverage, setLeverage] = useState(1);
   const sanitizeNumberInput = (value: string) => {
     const normalized = value.replace(/,/g, '.');
     const cleaned = normalized.replace(/[^0-9.]/g, '');
@@ -132,9 +129,10 @@ export function AggregatorPage({
     if (firstDot === -1) return cleaned;
     return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
   };
+  const isBtcAmountLocked = usdtAmount.trim().length > 0;
+  const isUsdtAmountLocked = btcAmount.trim().length > 0;
   const [limitPrice, setLimitPrice] = useState('');
   const [limitPriceMode, setLimitPriceMode] = useState('Dynamic');
-  const [leverage, setLeverage] = useState(1);
   const [duration, setDuration] = useState('5');
   const [timezone, setTimezone] = useState('Europe/London UTC+00:00');
   const [timeStart, setTimeStart] = useState('01/23/2026 20:00');
@@ -205,20 +203,10 @@ export function AggregatorPage({
   // Get exchanges from centralized store
   const allExchanges = exchanges.map(ex => ex.name);
   
-  // RWA DEXs supported
-  const RWA_DEXS = [
-    { id: 'xyz', name: 'XYZ' },
-    { id: 'vntl', name: 'VNTL' },
-    { id: 'km', name: 'KM' },
-    { id: 'cash', name: 'CASH' },
-    { id: 'flx', name: 'FLX' },
-    { id: 'hyna', name: 'HYNA' },
-  ];
-  
   // Parse selectedAsset to get base and quote tokens
   const baseToken = selectedAsset.split(':')[0]; // e.g., "BTC", "SILVER", "AAPL"
   const assetSymbol = selectedAsset.split(':')[1] || baseToken; // e.g., "SILVER", "AAPL"
-  const quoteToken = 'USD'; // We use USD for trading pairs
+  const quoteToken = 'USDC'; // Displayed quote token
   
   // Get current price and data for selected asset
   // Check if it's an RWA asset first
@@ -274,7 +262,7 @@ export function AggregatorPage({
     return {
       symbol: asset.perpSymbol,
       volume24h: asset.marketData.volume24h > 0 
-        ? '$' + (asset.marketData.volume24h / 1000000000).toFixed(1) + 'B' 
+        ? '$' + (asset.marketData.volume24h * asset.marketData.price / 1000000000).toFixed(1) + 'B' 
         : '--',
       oi: formatOI(asset.marketData.openInterest),
       change24h: asset.marketData.priceChangePercent24h,
@@ -307,29 +295,8 @@ export function AggregatorPage({
               return symbolLower.startsWith(`${selectedDex}:`);
             });
         
-        // Deduplicate by removing DEX prefix and keeping only unique assets (Aggregator page only)
-        // E.g., xyz:SILVER:PERP-USDC and vntl:SILVER:PERP-USDC should show as one entry
-        const seenAssets = new Map<string, typeof filteredAssets[0]>();
-        filteredAssets.forEach(asset => {
-          // Remove DEX prefix to get the base symbol
-          const baseSymbol = asset.symbol.replace(/^(xyz|vntl|km|cash|flx|hyna):/i, '');
-          
-          // Keep the first occurrence (or the one with highest volume if you prefer)
-          if (!seenAssets.has(baseSymbol)) {
-            seenAssets.set(baseSymbol, asset);
-          } else {
-            // Optional: Keep the one with higher volume
-            const existing = seenAssets.get(baseSymbol)!;
-            if (parseVolume(asset.volume24h) > parseVolume(existing.volume24h)) {
-              seenAssets.set(baseSymbol, asset);
-            }
-          }
-        });
-        
-        const uniqueAssets = Array.from(seenAssets.values());
-        
         // Sort by volume (highest to lowest)
-        return uniqueAssets.sort((a, b) => parseVolume(b.volume24h) - parseVolume(a.volume24h));
+        return [...filteredAssets].sort((a, b) => parseVolume(b.volume24h) - parseVolume(a.volume24h));
       })();
   
   const allStrategies = [
@@ -400,18 +367,6 @@ export function AggregatorPage({
       setAssetType(detectedType);
     }
   }, [selectedAsset]);
-
-  // Auto-sync exchangeType with assetType (Aggregator page only)
-  // When user selects an RWA asset, only show RWA exchanges
-  // When user selects a crypto asset, only show crypto exchanges
-  useEffect(() => {
-    if (assetType !== exchangeType) {
-      console.log(`🔄 Auto-syncing exchange type: ${exchangeType} → ${assetType}`);
-      setExchangeType(assetType);
-      // Clear selected exchanges when switching types to avoid confusion
-      setSelectedExchanges([]);
-    }
-  }, [assetType]);
 
   // Fetch comprehensive market metrics for HIP-3 assets from Hyperliquid
   useEffect(() => {
@@ -802,14 +757,12 @@ export function AggregatorPage({
       setRwaError(null);
       try {
         if (selectedDex === 'all') {
-          // For "all" mode, just load xyz (primary DEX) for speed
-          // Users can select specific DEXs to see data from other sources
-          console.log('⚡ Loading primary DEX (xyz) for "All" view');
-          const data = await fetchSingleDexRWADataFast(projectId, publicAnonKey, 'xyz', setRwaDataSource, setRwaError);
-          setRwaData(data);
+          // Fetch from ALL DEXs and combine
+          const combinedData = await fetchAllDexsRWAData(projectId, publicAnonKey, setRwaDataSource, setRwaError);
+          setRwaData(combinedData);
         } else {
-          // Fetch from single DEX using fast optimized helper
-          const data = await fetchSingleDexRWADataFast(projectId, publicAnonKey, selectedDex, setRwaDataSource, setRwaError);
+          // Fetch from single DEX using optimized helper
+          const data = await fetchSingleDexRWAData(projectId, publicAnonKey, selectedDex, setRwaDataSource, setRwaError);
           setRwaData(data);
         
           const totalAssets = data.commodities.length + data.stocks.length + data.indices.length;
@@ -829,24 +782,6 @@ export function AggregatorPage({
     fetchRWAData();
   }, [assetType, selectedDex]); // Fetch when switching to RWA tab or changing DEX
 
-  // Update positions with current prices for PNL calculation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const priceMap = new Map<string, number>();
-      
-      // Build price map from current prices
-      // prices is a Record<string, number>, not a Map
-      for (const [symbol, price] of Object.entries(prices)) {
-        priceMap.set(symbol, price);
-      }
-      
-      // Update positions with current market prices
-      updatePositions(priceMap);
-    }, 2000); // Update every 2 seconds
-    
-    return () => clearInterval(interval);
-  }, [prices]); // Removed updatePositions from dependencies - it's a stable Zustand action
-
   return (
     <div className={`h-[calc(100vh-3rem-1px)] flex flex-col ${colors.bg.subtle}`} style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       {/* Top Header Bar - 56px */}
@@ -858,15 +793,7 @@ export function AggregatorPage({
               <div className="w-6 h-6 rounded-full bg-[#F3B955] flex items-center justify-center text-button font-bold text-black">
                 ₿
               </div>
-              <span className={`text-body ${colors.text.primary} font-medium`}>
-                {/* Format: Remove DEX prefix and change USDC to USD for display only (Aggregator page) */}
-                {assetType === 'rwa' 
-                  ? selectedAsset
-                      .replace(/^(xyz|vntl|km|cash|flx|hyna):/i, '') // Remove DEX prefix
-                      .replace(/-USDC$/i, '-USD') // Change USDC to USD
-                  : selectedAsset
-                }
-              </span>
+              <span className={`text-body ${colors.text.primary} font-medium`}>{selectedAsset}</span>
               <button
                 onClick={() => setAssetDropdownOpen(!assetDropdownOpen)}
                 className={`p-0.5 hover:${colors.bg.subtle} rounded transition-colors`}
@@ -953,7 +880,37 @@ export function AggregatorPage({
                   </div>
                 )}
                 
-                {/* DEX filter removed per user request - Aggregator page only */}
+                {/* HIP-3 DEX Selector - only show when RWA tab is active */}
+                {assetType === 'rwa' && (
+                  <div className={`flex border-b ${colors.border.primary} ${colors.bg.subtle} px-3 py-2`}>
+                    <div className="flex items-center gap-1">
+                      {/* ALL tab */}
+                      <button
+                        onClick={() => setSelectedDex('all')}
+                        className={`px-3 py-1 text-label font-medium rounded transition-colors ${
+                          selectedDex === 'all'
+                            ? `${colors.bg.primary} ${colors.text.primary} border ${colors.border.secondary}`
+                            : `${colors.text.tertiary} ${colors.text.hoverPrimary}`
+                        }`}
+                      >
+                        ALL
+                      </button>
+                      {(['xyz', 'vntl', 'km', 'cash', 'flx', 'hyna'] as const).map((dex) => (
+                        <button
+                          key={dex}
+                          onClick={() => setSelectedDex(dex)}
+                          className={`px-3 py-1 text-label font-medium rounded transition-colors ${
+                            selectedDex === dex
+                              ? `${colors.bg.primary} ${colors.text.primary} border ${colors.border.secondary}`
+                              : `${colors.text.tertiary} ${colors.text.hoverPrimary}`
+                          }`}
+                        >
+                          {dex}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Mock Data Warning - show when RWA data is mock (but not for "all" since it uses xyz) */}
                 {assetType === 'rwa' && rwaDataSource === 'mock' && selectedDex !== 'all' && (
@@ -1003,13 +960,7 @@ export function AggregatorPage({
                           }`}
                         >
                           <div className={`w-40 text-body font-medium whitespace-nowrap ${isSelected ? 'text-[#C9A36A]' : colors.text.primary}`}>
-                            {/* Format: Remove DEX prefix and change USDC to USD for display only (Aggregator page) */}
-                            {assetType === 'rwa' 
-                              ? asset.symbol
-                                  .replace(/^(xyz|vntl|km|cash|flx|hyna):/i, '') // Remove DEX prefix
-                                  .replace(/-USDC$/i, '-USD') // Change USDC to USD
-                              : asset.symbol
-                            }
+                            {asset.symbol}
                           </div>
                           <div className={`w-24 text-right text-label ${colors.text.tertiary}`} style={{ fontFeatureSettings: '"tnum" on' }}>
                             {asset.volume24h}
@@ -1364,58 +1315,26 @@ export function AggregatorPage({
                 </button>
                 
                 {exchangesDropdownOpen && (
-                  <div className={`absolute top-full left-0 right-0 mt-1 ${colors.bg.primary} border ${colors.border.secondary} rounded shadow-lg z-50`}>
-                    {/* Auto-synced exchange type header (no tabs - syncs with selected asset) */}
-                    <div className={`px-3 py-2 border-b ${colors.border.secondary} text-[11px] font-medium ${colors.text.tertiary}`}>
-                      {assetType === 'crypto' ? 'Crypto Exchanges' : 'RWA DEXs'}
-                    </div>
-                    
-                    {/* Exchange/DEX List */}
-                    <div className="max-h-48 overflow-y-auto">
-                      {exchangeType === 'crypto' ? (
-                        // Crypto Exchanges
-                        allExchanges.map((exchange) => {
-                          const isSelected = selectedExchanges.includes(exchange);
-                          return (
-                            <label
-                              key={exchange}
-                              className={`flex items-center gap-2 px-3 py-2 text-xs hover:${colors.bg.subtle} cursor-pointer`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleExchange(exchange)}
-                                className="w-3 h-3"
-                              />
-                              <span className={colors.text.primary}>
-                                {exchange}
-                              </span>
-                            </label>
-                          );
-                        })
-                      ) : (
-                        // RWA DEXs
-                        RWA_DEXS.map((dex) => {
-                          const isSelected = selectedExchanges.includes(dex.name);
-                          return (
-                            <label
-                              key={dex.id}
-                              className={`flex items-center gap-2 px-3 py-2 text-xs hover:${colors.bg.subtle} cursor-pointer`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleExchange(dex.name)}
-                                className="w-3 h-3"
-                              />
-                              <span className={colors.text.primary}>
-                                {dex.name}
-                              </span>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
+                  <div className={`absolute top-full left-0 right-0 mt-1 ${colors.bg.primary} border ${colors.border.secondary} rounded shadow-lg z-50 max-h-48 overflow-y-auto`}>
+                    {allExchanges.map((exchange) => {
+                      const isSelected = selectedExchanges.includes(exchange);
+                      return (
+                        <label
+                          key={exchange}
+                          className={`flex items-center gap-2 px-3 py-2 text-xs hover:${colors.bg.subtle} cursor-pointer`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleExchange(exchange)}
+                            className="w-3 h-3"
+                          />
+                          <span className={colors.text.primary}>
+                            {exchange}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1442,36 +1361,26 @@ export function AggregatorPage({
                 </button>
               </div>
 
-              {/* BTC/USDT Inputs */}
+              {/* BTC/USDC Inputs */}
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
                   placeholder={baseToken}
                   value={btcAmount}
-                  onChange={(e) => {
-                    const value = sanitizeNumberInput(e.target.value);
-                    setBtcAmount(value);
-                    if (value.trim().length > 0) {
-                      setUsdtAmount('');
-                    }
-                  }}
-                  disabled={isBtcAmountLocked}
+                  onChange={(e) => setBtcAmount(sanitizeNumberInput(e.target.value))}
                   inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  disabled={isBtcAmountLocked}
                   className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isBtcAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 <input
                   type="text"
                   placeholder={quoteToken}
                   value={usdtAmount}
-                  onChange={(e) => {
-                    const value = sanitizeNumberInput(e.target.value);
-                    setUsdtAmount(value);
-                    if (value.trim().length > 0) {
-                      setBtcAmount('');
-                    }
-                  }}
-                  disabled={isUsdtAmountLocked}
+                  onChange={(e) => setUsdtAmount(sanitizeNumberInput(e.target.value))}
                   inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  disabled={isUsdtAmountLocked}
                   className={`${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} placeholder-${colors.text.quaternary} ${isUsdtAmountLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
@@ -1485,7 +1394,7 @@ export function AggregatorPage({
               </div>
 
               {/* Leverage */}
-              <div className="space-y-2 mt-4">
+              <div className="space-y-1">
                 <label className={`block text-label ${colors.text.tertiary}`}>Leverage</label>
                 <div className="flex items-center gap-2">
                   <input
@@ -1494,7 +1403,7 @@ export function AggregatorPage({
                     max={50}
                     step={1}
                     value={leverage}
-                    onChange={(e) => setLeverage(Number(e.target.value))}
+                    onChange={(e) => setLeverage(parseInt(e.target.value, 10))}
                     className="flex-1 h-1"
                   />
                   <span className={`text-[10px] ${colors.text.tertiary}`}>{leverage}x</span>
@@ -2312,40 +2221,33 @@ export function AggregatorPage({
                     amount = 0.25;
                   }
                   
-                  // Calculate USDT quantity from amount
+                  // Calculate USDC quantity from amount
                   const usdQuantity = amount * price;
-                  // Prefer user-entered USDC amount if provided (avoids $0 when price hasn't loaded)
                   const usdcNotional = usdtAmount && parseFloat(usdtAmount) > 0
                     ? parseFloat(usdtAmount)
                     : usdQuantity;
                   
-                  // Generate order ID
-                  const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                  
-                  // Record trade execution in new trades store
-                  addTrade({
-                    exchange: exchange,
-                    symbol: selectedAsset,
-                    side: orderSide,
-                    size: amount,
-                    executionPrice: price,
-                    tradingMode: 'aggregator',
-                    orderType: orderType,
-                    notes: `Quick ${orderSide} via Aggregator`,
-                  });
-                  
-                  // Add order to compatibility store
+                  // Add order to global trades store
                   addOrder({
-                    id: orderId,
                     type: orderSide === 'buy' ? 'long' : 'short',
                     exchange: exchange,
                     token: token,
                     size: amount,
                     price: price,
-                    filled: 0,
                     status: 'pending',
                     source: 'aggregator',
                   });
+                  
+                  addTrade({
+                    type: orderSide === 'buy' ? 'long' : 'short',
+                    exchange: exchange,
+                    token: token,
+                    size: amount,
+                    entryPrice: price,
+                    source: 'aggregator',
+                    fundingRate: 0.01,
+                    leverage: leverage,
+                  }, true); // Skip auto history since we add manually below
                   
                   // Add to history with complete trade details
                   const historyEntry = {
@@ -2355,20 +2257,15 @@ export function AggregatorPage({
                     token: token,
                     exchange: exchange,
                     status: 'completed' as const,
-                    volume: usdQuantity, // USDT value of the trade
+                    volume: usdQuantity, // USDC value of the trade
                     buyQuantity: orderSide === 'buy' ? usdcNotional : undefined,
                     buyLeverage: orderSide === 'buy' ? leverage : undefined,
                     sellQuantity: orderSide === 'sell' ? usdcNotional : undefined,
                     sellLeverage: orderSide === 'sell' ? leverage : undefined,
                     buyExchange: orderSide === 'buy' ? exchange : undefined,
                     sellExchange: orderSide === 'sell' ? exchange : undefined,
-                    buyPair: orderSide === 'buy' ? selectedAsset : undefined,
-                    sellPair: orderSide === 'sell' ? selectedAsset : undefined,
-                    buyPrice: orderSide === 'buy' ? price : undefined,
-                    sellPrice: orderSide === 'sell' ? price : undefined,
                     duration: parseFloat(duration) || 5,
                     exchanges: selectedExchanges.length > 0 ? selectedExchanges : [exchange],
-                    source: 'aggregator',
                   };
                   console.log('🔵 AggregatorPage - Creating history entry:', {
                     selectedExchanges,
@@ -2396,7 +2293,7 @@ export function AggregatorPage({
                       exchange: buyExchange,
                       side: 'long' as const,
                       quantity: amount,
-                      leverage: 1, // Default leverage for aggregator
+                      leverage: leverage,
                       entryPrice: price,
                       entryFundingRate: buyFundingRate,
                       timestamp: Date.now(),
@@ -2408,7 +2305,7 @@ export function AggregatorPage({
                       exchange: sellExchange,
                       side: 'short' as const,
                       quantity: amount,
-                      leverage: 1, // Default leverage for aggregator
+                      leverage: leverage,
                       entryPrice: price,
                       entryFundingRate: sellFundingRate,
                       timestamp: Date.now(),
@@ -2424,7 +2321,7 @@ export function AggregatorPage({
                       exchange: exchange,
                       side: orderSide === 'buy' ? 'long' : 'short' as const,
                       quantity: amount,
-                      leverage: 1, // Default leverage for aggregator
+                      leverage: leverage,
                       entryPrice: price,
                       entryFundingRate: currentFundingRate,
                       timestamp: Date.now(),

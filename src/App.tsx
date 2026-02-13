@@ -8,7 +8,6 @@
 import { FC, useEffect } from "react";
 import { Toaster } from "./components/ui/sonner";
 import { MockWalletProvider, useMockWallet } from "./contexts/MockWalletContext";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Stores
 import { useAppStore } from "./stores/appStore";
@@ -253,9 +252,7 @@ const App: FC = () => {
   
   return (
     <MockWalletProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <AppContent />
     </MockWalletProvider>
   );
 };

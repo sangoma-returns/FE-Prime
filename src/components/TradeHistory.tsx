@@ -198,14 +198,7 @@ export default function TradeHistory({ activeOrder, onClearActiveOrder, initialD
   // Set initial selected trade based on parameters to avoid flickering
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(() => {
     if (activeOrder) {
-      // Prefer latest history entry (has leverage/USDC notional) when available
-      const latestHistoryTrade = globalHistoryTrades.length > 0
-        ? globalHistoryTrades[globalHistoryTrades.length - 1]
-        : null;
-      if (latestHistoryTrade) {
-        return latestHistoryTrade;
-      }
-      // Fallback: Convert Order to Trade format
+      // Convert Order to Trade format
       return {
         pair: activeOrder.buyPair,
         side: 'Single',
@@ -222,9 +215,6 @@ export default function TradeHistory({ activeOrder, onClearActiveOrder, initialD
     } else if (initialTradeType === 'multi') {
       // Don't auto-select here - use useEffect to wait for fresh data
       return null;
-    } else if (initialTradeType === 'mm') {
-      // Don't auto-select here - use useEffect to wait for fresh data
-      return null;
     }
     return null;
   });
@@ -232,24 +222,14 @@ export default function TradeHistory({ activeOrder, onClearActiveOrder, initialD
   // Auto-select trade based on initialTradeType when data is ready
   useEffect(() => {
     if (initialTradeType === 'multi' && !selectedTrade && globalHistoryTrades.length > 0) {
-      // Find the latest Multi trade in globalHistoryTrades
-      const multiTrade = [...globalHistoryTrades].reverse().find(t => t.side === 'Multi');
-      if (multiTrade) {
+      // Find the FIRST (latest) Multi trade in globalHistoryTrades (not mock trades)
+      const multiTrade = globalHistoryTrades[0]; // Latest trade is always first
+      if (multiTrade && multiTrade.side === 'Multi') {
         console.log('🟡 TradeHistory - Auto-selecting Multi trade:', {
           tradeExchanges: multiTrade.exchanges,
           multiTrade
         });
         setSelectedTrade(multiTrade);
-      }
-    }
-    if (initialTradeType === 'mm' && !selectedTrade && globalHistoryTrades.length > 0) {
-      const mmTrade = [...globalHistoryTrades].reverse().find(t => t.side === 'MM');
-      if (mmTrade) {
-        console.log('🟠 TradeHistory - Auto-selecting MM trade:', {
-          tradeExchanges: mmTrade.exchanges,
-          mmTrade
-        });
-        setSelectedTrade(mmTrade);
       }
     }
   }, [initialTradeType, globalHistoryTrades, selectedTrade]);

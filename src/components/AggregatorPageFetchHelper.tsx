@@ -14,7 +14,7 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL = 60000; // 60 seconds (increased from 30s for better performance)
+const CACHE_TTL = 30000; // 30 seconds
 
 function getCachedData(key: string): CacheEntry | null {
   const entry = cache.get(key);
@@ -62,31 +62,19 @@ export async function fetchAllDexsRWAData(
   // STEP 1: Fetch all symbol lists in PARALLEL
   const symbolListPromises = allDexs.map(async (dex) => {
     try {
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second timeout
-      
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-9f8d65d6/hyperliquid/rwa?dex=${dex}`, {
         headers: { 'Authorization': `Bearer ${publicAnonKey}` },
-        signal: controller.signal,
       });
       
-      clearTimeout(timeoutId);
-      
       if (!response.ok) {
-        console.warn(`${dex} returned ${response.status}`);
+        // Silently skip - expected during page load
         return null;
       }
       
       const data = await response.json();
       return { dex, data };
     } catch (error) {
-      // Log timeout and other errors for debugging
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.warn(`${dex}: Request timeout after 12s`);
-      } else {
-        console.warn(`${dex} error:`, error);
-      }
+      // Silently skip fetch errors - not critical for app functionality
       return null;
     }
   });
@@ -201,37 +189,6 @@ export async function fetchAllDexsRWAData(
   const totalAssets = commoditiesData.length + stocksData.length + indicesData.length;
   const elapsed = Date.now() - startTime;
   console.log(`⚡ Loaded ${totalAssets} assets in ${(elapsed / 1000).toFixed(2)}s (${commoditiesData.length} commodities, ${stocksData.length} stocks, ${indicesData.length} indices)`);
-  
-  // If we got no data at all, return mock data instead of empty arrays
-  if (totalAssets === 0) {
-    console.warn('⚠️ No live data from any DEX, returning mock data');
-    const mockData = {
-      commodities: [
-        { symbol: 'GOLD:PERP-USDC', volume24h: '$125M', volume24hUsd: 125000000, oi: '$45M', oiUsd: 45000000, change24h: 0.5, price: 5032.0, dataSource: 'mock', dex: 'xyz' },
-        { symbol: 'SILVER:PERP-USDC', volume24h: '$85M', volume24hUsd: 85000000, oi: '$32M', oiUsd: 32000000, change24h: 1.2, price: 99.155, dataSource: 'mock', dex: 'xyz' },
-      ],
-      stocks: [
-        { symbol: 'AAPL:PERP-USDC', volume24h: '$250M', volume24hUsd: 250000000, oi: '$95M', oiUsd: 95000000, change24h: -0.8, price: 257.55, dataSource: 'mock', dex: 'xyz' },
-        { symbol: 'NVDA:PERP-USDC', volume24h: '$310M', volume24hUsd: 310000000, oi: '$120M', oiUsd: 120000000, change24h: 2.1, price: 192.32, dataSource: 'mock', dex: 'xyz' },
-      ],
-      indices: [
-        { symbol: 'US500:PERP-USDC', volume24h: '$400M', volume24hUsd: 400000000, oi: '$150M', oiUsd: 150000000, change24h: 0.3, price: 6932.7, dataSource: 'mock', dex: 'xyz' },
-      ],
-    };
-    
-    setRwaDataSource('mock');
-    setRwaError('Failed to load live data - showing mock data');
-    
-    // Cache the mock result
-    setCachedData(cacheKey, {
-      data: mockData,
-      timestamp: Date.now(),
-      source: 'mock',
-      error: 'Failed to load live data',
-    });
-    
-    return mockData;
-  }
   
   const result = {
     commodities: commoditiesData,

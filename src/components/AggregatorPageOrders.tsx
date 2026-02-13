@@ -259,7 +259,7 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
                       <div className="w-16 h-2 bg-gray-700 rounded-full overflow-hidden">
                         <div className="h-full bg-green-500" style={{ width: `${order.filled}%` }}></div>
                       </div>
-                      <span className={colors.text.secondary}>{isNaN(order.filled) ? 0 : order.filled}%</span>
+                      <span className={colors.text.secondary}>{order.filled}%</span>
                     </div>
                   </td>
                   <td className={`px-3 py-0.5 text-label ${order.statusColor} whitespace-nowrap`}>{order.status}</td>
@@ -284,7 +284,7 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
               </tr>
             </thead>
             <tbody>
-              <tr key="rebalancing-1" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>14:32:15</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Hyperliquid</td>
@@ -293,7 +293,7 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>0.0823</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>0.0715</td>
               </tr>
-              <tr key="rebalancing-2" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>13:47:08</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Hyperliquid</td>
@@ -302,7 +302,7 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>0.0698</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>0.0742</td>
               </tr>
-              <tr key="rebalancing-3" className={`hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>11:23:42</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Hyperliquid</td>
@@ -325,21 +325,21 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
               </tr>
             </thead>
             <tbody>
-              <tr key="deposit-withdraw-1" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDT</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>$1.000</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>Deposit</td>
               </tr>
-              <tr key="deposit-withdraw-2" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Hyperliquid</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDC</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>$1.000</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>Withdrawal</td>
               </tr>
-              <tr key="deposit-withdraw-3" className={`hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDT</td>
@@ -359,19 +359,19 @@ export function OrdersSection({ activeTab, onTabChange, orders = [] }: OrdersSec
               </tr>
             </thead>
             <tbody>
-              <tr key="funding-1" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDT</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>5.5600%</td>
               </tr>
-              <tr key="funding-2" className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`border-b ${colors.border.secondary} hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Hyperliquid</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDC</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>10.9500%</td>
               </tr>
-              <tr key="funding-3" className={`hover:${colors.bg.subtle} transition-colors`}>
+              <tr className={`hover:${colors.bg.subtle} transition-colors`}>
                 <td className={`px-3 py-0.5 text-label ${colors.text.tertiary} whitespace-nowrap`}>03/10/2026</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.secondary} whitespace-nowrap`}>Paradex</td>
                 <td className={`px-3 py-0.5 text-label ${colors.text.primary} whitespace-nowrap`}>BTC-PERP-USDT</td>

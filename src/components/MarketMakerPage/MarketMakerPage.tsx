@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useThemeStore } from '../../stores/themeStore';
-import { useNavigation } from '../../hooks/useNavigation';
 import { useAppStore } from '../../stores/appStore';
 import { useTradesStore } from '../../stores/tradesStore';
 import { useMarketDataStore } from '../../stores/marketDataStore';
 import type { ActiveMarketMakerStrategy } from '../../stores/appStore';
 import { ChevronDown, Info, Plus, Trash2, Upload } from 'lucide-react';
-import { toast } from 'sonner';
 import { ExchangePairSelector } from '../ExchangePairSelector';
 
 interface MarketMakerPageProps {
@@ -76,9 +74,8 @@ export default function MarketMakerPage({
   onNavigateToStrategy,
 }: MarketMakerPageProps) {
   const { colors } = useThemeStore();
-  const { navigateTo } = useNavigation();
   const deployMarketMakerStrategies = useAppStore((s) => s.deployMarketMakerStrategies);
-  const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
+  const { addTrade, addOrder } = useTradesStore();
   const { exchanges, assets, getAsset } = useMarketDataStore();
   
   // Get exchanges and pairs from centralized store
@@ -1572,19 +1569,13 @@ export default function MarketMakerPage({
             </div>
 
             {/* Start Button */}
-            <div className="relative group">
-              <button
-                onClick={() => {
-                  if (!selectedExchange || !selectedPair || !margin) {
-                    toast.error('Select an exchange, trading pair, and margin to start.');
-                    if (!selectedExchange || !selectedPair) {
-                      setShowExchangePairSelector(true);
-                    }
-                    return;
-                  }
-                  
-                  // Create strategy for advanced bot
-                  const strategyId = `advanced-${selectedPair.replace('/', '')}-${Date.now()}`;
+            <button
+              disabled={!selectedExchange || !selectedPair || !margin}
+              onClick={() => {
+                if (!selectedExchange || !selectedPair || !margin) return;
+                
+                // Create strategy for advanced bot
+                const strategyId = `advanced-${selectedPair.replace('/', '')}-${Date.now()}`;
                 const newStrategy: ActiveMarketMakerStrategy = {
                   id: strategyId,
                   name: `Advanced Bot - ${selectedPair}`,
@@ -1645,56 +1636,14 @@ export default function MarketMakerPage({
                   leverage: parseFloat(leverage) || 1,
                   volume: parseFloat(volume), // Explicit volume: margin × leverage × 20
                 });
-
-                // Add history entry so TradeHistory can show execution detail immediately
-                addHistoryEntry({
-                  type: 'trade',
-                  action: `MM: ${token} on ${selectedExchange}`,
-                  amount: tokenSize,
-                  token: token,
-                  exchange: selectedExchange,
-                  status: 'completed',
-                  volume: parseFloat(volume) || 0,
-                  buyQuantity: orderAmountUSDC,
-                  buyLeverage: parseFloat(leverage) || 1,
-                  buyExchange: selectedExchange,
-                  buyPair: selectedPair,
-                  buyPrice: price,
-                  duration: parseFloat(refreshTime) || 5,
-                  exchanges: [selectedExchange],
-                  source: 'market-maker',
-                  timestamp: Date.now(),
-                });
                 
-                // Navigate to Portfolio -> History after starting
-                toast.success('Market making started.');
-                const targetQuery = 'tab=history&detailTab=execution&trade=mm';
-                const targetUrl = `/portfolio?${targetQuery}`;
-                navigateTo('portfolio', targetQuery);
-                // Hard fallback if the SPA navigation doesn't trigger in production
-                setTimeout(() => {
-                  if (!window.location.pathname.startsWith('/portfolio')) {
-                    window.location.assign(targetUrl);
-                  }
-                }, 50);
+                // Navigate to strategy monitor
+                onNavigateToStrategy?.(strategyId);
               }}
-                className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all`}
-              >
-                Start Market Making
-              </button>
-              
-              {/* Tooltip showing what's missing */}
-              {(!selectedExchange || !selectedPair || !margin) && (
-                <div className={`absolute bottom-full left-0 right-0 mb-2 px-3 py-2 ${colors.bg.surface} border ${colors.border.default} rounded shadow-lg text-label ${colors.text.secondary} opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20`}>
-                  <div className="font-medium mb-1">Please complete the following:</div>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {!selectedExchange && <li>Select an exchange and trading pair</li>}
-                    {!selectedPair && selectedExchange && <li>Select a trading pair</li>}
-                    {!margin && <li>Enter a margin amount</li>}
-                  </ul>
-                </div>
-              )}
-            </div>
+              className={`w-full h-10 ${colors.button.primaryBg} hover:opacity-90 text-white rounded text-button font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              Start Market Making
+            </button>
           </div>
         </div>
         )}

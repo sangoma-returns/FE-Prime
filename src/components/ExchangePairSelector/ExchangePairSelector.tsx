@@ -44,8 +44,6 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
   const [selectedExchangeFilter, setSelectedExchangeFilter] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState<PairCategory>('perps');
-  const [exchangeType, setExchangeType] = useState<'crypto' | 'rwa'>('crypto'); // New: Crypto vs RWA toggle
-  const [selectedRWADexs, setSelectedRWADexs] = useState<string[]>([]); // New: Selected RWA DEXs
   
   // RWA Data state
   const [rwaData, setRwaData] = useState<{
@@ -162,7 +160,7 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
   });
   
   // For RWAs tab, create pairs from RWA data
-  const rwaPairs = (activeCategory === 'rwas' || exchangeType === 'rwa') ? [
+  const rwaPairs = activeCategory === 'rwas' ? [
     ...rwaData.commodities,
     ...rwaData.stocks,
     ...rwaData.indices
@@ -195,7 +193,7 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
   }) : [];
   
   // Transform pairs for display - convert PERP to Spot format when Spot tab is selected
-  const displayPairs = (activeCategory === 'rwas' || exchangeType === 'rwa') ? rwaPairs : filteredPairs.map(pair => {
+  const displayPairs = activeCategory === 'rwas' ? rwaPairs : filteredPairs.map(pair => {
     if (activeCategory === 'spot' && pair.pair.includes('PERP')) {
       // Convert "BTC:PERP-USDT" to "BTC-Spot-USDT"
       const transformedPair = pair.pair.replace(':PERP-', '-Spot-').replace('PERP-', 'Spot-');
@@ -250,28 +248,7 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
               ].map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => {
-                    setActiveCategory(category.id);
-                    // Auto-switch to RWA exchange type when RWAs tab is clicked
-                    if (category.id === 'rwas') {
-                      setExchangeType('rwa');
-                      setSelectedExchangeFilter([]);
-                      // Auto-load RWA data if not loaded
-                      if (rwaData.commodities.length === 0 && !rwaLoading) {
-                        setRwaLoading(true);
-                        fetchAllDexsRWAData(projectId, publicAnonKey, () => {}, () => {})
-                          .then(data => {
-                            setRwaData(data);
-                            setRwaLoading(false);
-                          })
-                          .catch(() => setRwaLoading(false));
-                      }
-                    } else {
-                      // Reset to crypto exchange type for non-RWA tabs
-                      setExchangeType('crypto');
-                      setSelectedExchangeFilter([]);
-                    }
-                  }}
+                  onClick={() => setActiveCategory(category.id)}
                   className={`pb-3 pt-3 text-button transition-colors ${
                     activeCategory === category.id
                       ? 'text-orange-500 border-b-2 border-orange-500'
@@ -286,84 +263,23 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
           
           {/* Exchange Filter Chips */}
           <div className={`border-b ${colors.border.primary} px-4 py-3`}>
-            {/* Exchange Type Tabs (Crypto / RWA) - Hide when RWAs tab is active */}
-            {activeCategory !== 'rwas' && (
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`flex items-center gap-2 text-[11px] ${colors.text.tertiary} uppercase tracking-wide`}>
-                  <span>EXCHANGES:</span>
-                  <div className={`w-4 h-4 rounded-full border ${colors.border.secondary} flex items-center justify-center`}>
-                    <span className="text-[10px]">?</span>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => {
-                      setExchangeType('crypto');
-                      setSelectedExchangeFilter([]);
-                    }}
-                    className={`px-3 py-1 text-[11px] font-medium rounded transition-colors ${
-                      exchangeType === 'crypto'
-                        ? `${colors.bg.brand} ${colors.text.brandContrast}`
-                        : `${colors.bg.tertiary} ${colors.text.secondary}`
-                    }`}
-                  >
-                    Crypto
-                  </button>
-                  <button
-                    onClick={() => {
-                      setExchangeType('rwa');
-                      setSelectedExchangeFilter([]);
-                      // Auto-load RWA data if not loaded
-                      if (rwaData.commodities.length === 0 && !rwaLoading) {
-                        setRwaLoading(true);
-                        fetchAllDexsRWAData(projectId, publicAnonKey, () => {}, () => {})
-                          .then(data => {
-                            setRwaData(data);
-                            setRwaLoading(false);
-                          })
-                          .catch(() => setRwaLoading(false));
-                      }
-                    }}
-                    className={`px-3 py-1 text-[11px] font-medium rounded transition-colors ${
-                      exchangeType === 'rwa'
-                        ? `${colors.bg.brand} ${colors.text.brandContrast}`
-                        : `${colors.bg.tertiary} ${colors.text.secondary}`
-                    }`}
-                  >
-                    RWAs
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* For RWAs tab, show only the DEX label without toggle buttons */}
-            {activeCategory === 'rwas' && (
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`flex items-center gap-2 text-[11px] ${colors.text.tertiary} uppercase tracking-wide`}>
-                  <span>EXCHANGES:</span>
-                  <div className={`w-4 h-4 rounded-full border ${colors.border.secondary} flex items-center justify-center`}>
-                    <span className="text-[10px]">?</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Exchange/DEX Selection Chips */}
             <div className="flex flex-wrap gap-2">
-              {(exchangeType === 'rwa' ? RWA_DEXS : EXCHANGES).map((exchange) => {
-                const isEnabled = exchangeType === 'rwa' || !enabledExchanges || enabledExchanges.length === 0 || normalizedEnabledExchanges.includes(exchange.id.toLowerCase());
+              {(activeCategory === 'rwas' ? RWA_DEXS : EXCHANGES).map((exchange) => {
+                const isEnabled = activeCategory === 'rwas' || !enabledExchanges || enabledExchanges.length === 0 || normalizedEnabledExchanges.includes(exchange.id.toLowerCase());
                 const isSelected = selectedExchangeFilter.includes(exchange.id);
-                const isRWADex = exchangeType === 'rwa';
+                const isRWADex = activeCategory === 'rwas';
                 
                 return (
                   <button
                     key={exchange.id}
                     onClick={() => isEnabled && toggleExchangeFilter(exchange.id)}
                     disabled={!isEnabled}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-button transition-colors border ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-button transition-colors ${
                       isSelected
-                        ? `${colors.bg.brandSubtle} ${colors.border.brand} ${colors.text.brand}`
-                        : `${colors.bg.tertiary} ${colors.border.secondary} ${colors.text.secondary} hover:${colors.border.primary}`
+                        ? 'bg-orange-500 text-white'
+                        : isDark
+                          ? 'bg-[#2a2a2a] text-gray-300 hover:bg-[#333333]'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     } ${!isEnabled ? 'opacity-30 cursor-not-allowed' : ''}`}
                   >
                     {!isRWADex && <span className="text-sm">{exchange.icon}</span>}

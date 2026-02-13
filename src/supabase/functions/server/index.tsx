@@ -410,44 +410,22 @@ app.get("/make-server-9f8d65d6/binance/ticker/24hr", async (c) => {
     const symbol = c.req.query('symbol') || 'BTCUSDT';
     const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`;
     
-    // Add timeout to prevent hanging requests with retry logic
-    let lastError;
-    const maxRetries = 2;
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15 seconds
-        
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          // If it's a rate limit error (429), wait and retry
-          if (response.status === 429 && attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
-            continue;
-          }
-          return c.json({ error: `Binance API returned ${response.status}` }, response.status);
-        }
-        
-        const data = await response.json();
-        return c.json(data);
-      } catch (err) {
-        lastError = err;
-        if (err.name === 'AbortError' && attempt < maxRetries) {
-          console.log(`Binance 24hr ticker attempt ${attempt + 1} timed out, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
-          continue;
-        }
-        throw err;
-      }
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return c.json({ error: `Binance API returned ${response.status}` }, response.status);
     }
     
-    throw lastError;
+    const data = await response.json();
+    return c.json(data);
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('Binance 24hr ticker request timed out after retries');
+      console.error('Binance 24hr ticker request timed out');
       return c.json({ error: 'Request timeout' }, 504);
     }
     console.error('Error fetching Binance 24hr ticker:', error);
@@ -460,44 +438,22 @@ app.get("/make-server-9f8d65d6/binance/ticker/price", async (c) => {
     const symbol = c.req.query('symbol') || 'BTCUSDT';
     const url = `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`;
     
-    // Add timeout to prevent hanging requests with retry logic
-    let lastError;
-    const maxRetries = 2;
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15 seconds
-        
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          // If it's a rate limit error (429), wait and retry
-          if (response.status === 429 && attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
-            continue;
-          }
-          return c.json({ error: `Binance API returned ${response.status}` }, response.status);
-        }
-        
-        const data = await response.json();
-        return c.json(data);
-      } catch (err) {
-        lastError = err;
-        if (err.name === 'AbortError' && attempt < maxRetries) {
-          console.log(`Binance price attempt ${attempt + 1} timed out, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
-          continue;
-        }
-        throw err;
-      }
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return c.json({ error: `Binance API returned ${response.status}` }, response.status);
     }
     
-    throw lastError;
+    const data = await response.json();
+    return c.json(data);
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error('Binance price request timed out after retries');
+      console.error('Binance price request timed out');
       return c.json({ error: 'Request timeout' }, 504);
     }
     console.error("Error proxying Binance price:", error);
@@ -546,31 +502,15 @@ app.get("/make-server-9f8d65d6/binance/futures/openInterest", async (c) => {
     const symbol = c.req.query('symbol') || 'BTCUSDT';
     const url = `https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`;
     
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const response = await fetch(url);
     
     if (!response.ok) {
-      // 400 errors are common for assets without futures contracts (expected)
-      // Only log these at debug level, not as errors
-      if (response.status === 400) {
-        console.debug(`⚠️ No futures contract available for ${symbol} (expected for some assets)`);
-      } else {
-        console.warn(`Binance Futures API returned ${response.status} for ${symbol}`);
-      }
       return c.json({ error: `Binance Futures API returned ${response.status}` }, response.status);
     }
     
     const data = await response.json();
     return c.json(data);
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.error('Binance OI request timed out');
-      return c.json({ error: 'Request timeout' }, 504);
-    }
     console.error("Error proxying Binance OI:", error);
     return c.json({
       error: "Failed to fetch from Binance Futures API",
@@ -775,10 +715,6 @@ app.post("/make-server-9f8d65d6/hyperliquid/asset-details", async (c) => {
   try {
     console.log(`🔍 Fetching HIP-3 metaAndAssetCtxs with dex="${hip3DexName}"...`);
     
-    // Add timeout signal to fail fast if Hyperliquid API is slow
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-    
     const response = await fetch(HYPERLIQUID_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -786,10 +722,7 @@ app.post("/make-server-9f8d65d6/hyperliquid/asset-details", async (c) => {
         type: "metaAndAssetCtxs",
         dex: hip3DexName
       }),
-      signal: controller.signal,
     });
-    
-    clearTimeout(timeoutId);
     
     console.log(`  → Status: ${response.status}`);
     
