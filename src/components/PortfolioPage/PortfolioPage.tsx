@@ -62,7 +62,10 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   // Calculate equity metrics
   const equityMetrics = useMemo(() => {
     // Calculate total exchange equity from allocations
-    const exchangeEquity = Object.values(appStoreExchangeAllocations).reduce((sum, amount) => sum + amount, 0);
+    const exchangeEquity = Object.values(appStoreExchangeAllocations).reduce((sum, amount) => {
+      const safeAmount = Number.isFinite(amount) ? amount : 0;
+      return sum + safeAmount;
+    }, 0);
     
     // Get realized PNL (from closed positions in history)
     const realizedPnl = history
@@ -81,12 +84,15 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     }, 0);
 
     // Base equity = vault + exchange allocations
-    const baseEquity = depositAmount + exchangeEquity;
+    const safeDeposit = Number.isFinite(depositAmount) ? depositAmount : 0;
+    const baseEquity = safeDeposit + exchangeEquity;
     // If no funding configured yet, fall back to locked margin so the UI isn't zero
     const effectiveBaseEquity = baseEquity > 0 ? baseEquity : liveLockedMargin;
 
     // Total equity = Base equity + Realized PNL + Unrealized PNL
-    const totalEquity = effectiveBaseEquity + realizedPnl + unrealizedPnl;
+    const safeRealized = Number.isFinite(realizedPnl) ? realizedPnl : 0;
+    const safeUnrealized = Number.isFinite(unrealizedPnl) ? unrealizedPnl : 0;
+    const totalEquity = effectiveBaseEquity + safeRealized + safeUnrealized;
     
     return {
       totalEquity,

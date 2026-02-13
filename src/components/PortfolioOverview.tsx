@@ -37,7 +37,10 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     const unlockedVaultEquity = depositAmount;
     
     // 2. Exchange equity (total funds allocated to exchanges)
-    const exchangeEquity = Object.values(exchangeAllocations).reduce((sum, amount) => sum + amount, 0);
+    const exchangeEquity = Object.values(exchangeAllocations).reduce((sum, amount) => {
+      const safeAmount = Number.isFinite(amount) ? amount : 0;
+      return sum + safeAmount;
+    }, 0);
     
     // 3. Locked margin equity (funds locked in open positions + market maker strategies)
     const positionsMargin = openPositions.reduce((sum, position) => {
@@ -64,21 +67,25 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
     // 5. Total equity (vault + exchanges + PnL from old + live positions)
     const oldPnL = openPositions.reduce((sum, position) => sum + (position.pnl || 0), 0);
     const livePnL = totalPnl; // From useLivePositions hook
-    const combinedPnL = oldPnL + livePnL;
+    const safeOldPnL = Number.isFinite(oldPnL) ? oldPnL : 0;
+    const safeLivePnL = Number.isFinite(livePnL) ? livePnL : 0;
+    const combinedPnL = safeOldPnL + safeLivePnL;
     const computedTotalEquity = unlockedVaultEquity + exchangeEquity + combinedPnL;
+    const safeComputedTotalEquity = Number.isFinite(computedTotalEquity) ? computedTotalEquity : 0;
     const totalEquity =
-      computedTotalEquity > 0
-        ? computedTotalEquity
+      safeComputedTotalEquity > 0
+        ? safeComputedTotalEquity
         : (backendSummary?.totalEquity ?? 0);
     
     // 6. Calculate total volume from trade history (using volume field which accounts for leverage)
     const computedVolume = history
       .filter(entry => entry.type === 'trade')
       .reduce((sum, entry) => sum + (entry.volume || 0), 0);
+    const baseEquity = unlockedVaultEquity + exchangeEquity;
     const totalVolume =
       computedVolume > 0
         ? computedVolume
-        : (backendSummary?.totalVolume ?? 0);
+        : (backendSummary?.totalVolume ?? baseEquity);
     
     return {
       totalEquity,
