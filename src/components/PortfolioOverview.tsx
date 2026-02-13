@@ -34,11 +34,13 @@ export default function PortfolioOverview({ depositAmount = 0, backendSummary = 
   // Calculate equity distribution
   const equityStats = useMemo(() => {
     // 1. Unlocked vault equity (depositAmount in vault)
-    const unlockedVaultEquity = depositAmount;
+    const safeDeposit = Number.isFinite(Number(depositAmount)) ? Number(depositAmount) : 0;
+    const unlockedVaultEquity = safeDeposit;
     
     // 2. Exchange equity (total funds allocated to exchanges)
     const exchangeEquity = Object.values(exchangeAllocations).reduce((sum, amount) => {
-      const safeAmount = Number.isFinite(amount) ? amount : 0;
+      const numericAmount = Number(amount);
+      const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
       return sum + safeAmount;
     }, 0);
     

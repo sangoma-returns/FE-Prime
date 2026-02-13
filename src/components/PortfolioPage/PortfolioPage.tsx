@@ -54,6 +54,7 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const [breakdownTab, setBreakdownTab] = useState<'venue' | 'asset' | 'strategyType'>('venue');
   const [selectedStrategy, setSelectedStrategy] = useState<{ id: string; name: string } | null>(null);
   const [backendSummary, setBackendSummary] = useState<PortfolioSummary | null>(null);
+  const showDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
   // Read URL parameters once on mount
   const [urlDetailTab, setUrlDetailTab] = useState<'status' | 'execution' | 'rebalancing' | null>(null);
@@ -63,7 +64,8 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
   const equityMetrics = useMemo(() => {
     // Calculate total exchange equity from allocations
     const exchangeEquity = Object.values(appStoreExchangeAllocations).reduce((sum, amount) => {
-      const safeAmount = Number.isFinite(amount) ? amount : 0;
+      const numericAmount = Number(amount);
+      const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
       return sum + safeAmount;
     }, 0);
     
@@ -84,7 +86,7 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
     }, 0);
 
     // Base equity = vault + exchange allocations
-    const safeDeposit = Number.isFinite(depositAmount) ? depositAmount : 0;
+    const safeDeposit = Number.isFinite(Number(depositAmount)) ? Number(depositAmount) : 0;
     const baseEquity = safeDeposit + exchangeEquity;
     // If no funding configured yet, fall back to locked margin so the UI isn't zero
     const effectiveBaseEquity = baseEquity > 0 ? baseEquity : liveLockedMargin;
@@ -386,6 +388,15 @@ export function PortfolioPage({ hasAccount, depositAmount, selectedExchanges, on
                 </button>
               </div>
             </div>
+            {showDebug && (
+              <div className={`${colors.bg.secondary} border ${colors.border.secondary} rounded-sm p-3 mb-4 text-[11px] ${colors.text.secondary}`}>
+                <div>DEBUG: depositAmount={depositAmount}</div>
+                <div>DEBUG: exchangeAllocations={JSON.stringify(appStoreExchangeAllocations)}</div>
+                <div>DEBUG: exchangeEquity={equityMetrics.exchangeEquity}</div>
+                <div>DEBUG: totalEquity={equityMetrics.totalEquity}</div>
+                <div>DEBUG: backendSummary={JSON.stringify(backendSummary)}</div>
+              </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
