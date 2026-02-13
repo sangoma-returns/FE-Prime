@@ -27,6 +27,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('Error caught by boundary:', error, errorInfo);
+    if (errorInfo?.componentStack) {
+      console.error('Component stack:', errorInfo.componentStack);
+    }
     this.setState({ errorInfo: errorInfo?.componentStack || null });
   }
 
@@ -46,6 +49,20 @@ export class ErrorBoundary extends Component<Props, State> {
           <p style={{ color: '#666', marginBottom: '1rem' }}>
             {this.state.error?.message || 'Unknown error'}
           </p>
+          {this.state.errorInfo && (
+            <pre style={{
+              background: '#f5f5f5',
+              padding: '1rem',
+              borderRadius: '0.375rem',
+              overflow: 'auto',
+              fontSize: '0.75rem',
+              marginBottom: '1rem',
+              maxWidth: '900px',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {this.state.errorInfo}
+            </pre>
+          )}
           <button
             onClick={() => window.location.reload()}
             style={{
