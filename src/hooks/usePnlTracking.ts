@@ -13,7 +13,9 @@
 
 import { useEffect, useRef } from 'react';
 import { usePnlHistoryStore } from '../stores/pnlHistoryStore';
-import { useLivePositions } from './useLivePositions';
+import { usePositionsStore } from '../stores/positionsStore';
+import { usePricesStore } from '../stores/pricesStore';
+import { useFundingRatesStore } from '../stores/fundingRatesStore';
 
 /**
  * Interval for recording data points (milliseconds)
@@ -25,15 +27,8 @@ const RECORDING_INTERVAL = 30 * 1000;
  * Hook to automatically track and record PNL history
  */
 export function usePnlTracking() {
-  const { addDataPoint, pruneOldData } = usePnlHistoryStore();
-  const {
-    positions,
-    totalPnl,
-    totalFundingPnl,
-    totalUnrealizedPnl,
-    openPositionCount,
-  } = useLivePositions();
-  
+  const addDataPoint = usePnlHistoryStore((s) => s.addDataPoint);
+  const pruneOldData = usePnlHistoryStore((s) => s.pruneOldData);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastRecordedRef = useRef<number>(0);
 
@@ -47,16 +42,37 @@ export function usePnlTracking() {
         return;
       }
 
+      const positionsStore = usePositionsStore.getState();
+      const pricesStore = usePricesStore.getState();
+      const fundingRatesStore = useFundingRatesStore.getState();
+
+      const openPositions = positionsStore.getOpenPositions();
+      if (openPositions.length === 0) {
+        return;
+      }
+
+      // Update cached PNL using latest prices and funding rates
+      positionsStore.updatePnlCache(pricesStore.prices, fundingRatesStore.rates);
+
       // Calculate position exposures
       let longExposure = 0;
       let shortExposure = 0;
+      let totalPnl = 0;
+      let totalFundingPnl = 0;
+      let totalUnrealizedPnl = 0;
 
-      positions.forEach(({ position }) => {
-        // Safety check: ensure position and legs exist
-        if (!position || !position.legs) {
+      openPositions.forEach((position) => {
+        if (!position.legs) {
           return;
         }
-        
+
+        const pnl = positionsStore.getCachedPnl(position.id);
+        if (pnl) {
+          totalPnl += pnl.totalPnl;
+          totalFundingPnl += pnl.fundingPnl;
+          totalUnrealizedPnl += pnl.unrealizedPnl;
+        }
+
         position.legs.forEach((leg) => {
           const notional = leg.quantity * leg.entryPrice;
           if (leg.side === 'long') {
@@ -77,23 +93,19 @@ export function usePnlTracking() {
         longExposure,
         shortExposure,
         netPosition,
-        positionCount: openPositionCount,
+        positionCount: openPositions.length,
       });
 
       lastRecordedRef.current = now;
-      console.log(`✓ Recorded PNL data point: Net PNL = $${totalPnl.toFixed(2)}, Positions = ${openPositionCount}`);
+      console.log(`✓ Recorded PNL data point: Net PNL = $${totalPnl.toFixed(2)}, Positions = ${openPositions.length}`);
     };
 
-    // Record initial data point if we have positions
-    if (positions.length > 0 && lastRecordedRef.current === 0) {
-      recordDataPoint();
-    }
+    // Record initial data point
+    recordDataPoint();
 
     // Set up interval to record data points
     intervalRef.current = setInterval(() => {
-      if (positions.length > 0) {
-        recordDataPoint();
-      }
+      recordDataPoint();
     }, RECORDING_INTERVAL);
 
     // Prune old data daily (keep last 7 days)
@@ -108,7 +120,7 @@ export function usePnlTracking() {
       }
       clearInterval(pruneInterval);
     };
-  }, [positions, totalPnl, totalFundingPnl, totalUnrealizedPnl, openPositionCount, addDataPoint, pruneOldData]);
+  }, [addDataPoint, pruneOldData]);
 }
 
 export default usePnlTracking;
