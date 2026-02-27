@@ -203,7 +203,7 @@ async function fetchFundingRatesFromBackend(): Promise<TokenFundingRates[]> {
     const tokenMap = new Map<string, TokenFundingRates>();
 
     data.forEach((item: any) => {
-      const token = item.token || item.symbol;
+      const token = String(item.token || item.symbol || '').toUpperCase();
       if (!token) return;
 
       if (!tokenMap.has(token)) {
@@ -357,17 +357,11 @@ const INITIAL_FUNDING_DATA: TokenFundingRates[] = [
 ];
 
 const buildInitialRates = () => {
-  // Keep token rows visible, but start all exchange rates as null so
-  // the UI stays blank until live data is fetched.
   const rates: Record<string, Record<string, number | null>> = {};
   const lastUpdated: Record<string, number> = {};
 
   INITIAL_FUNDING_DATA.forEach((tokenData) => {
-    const blankRates: Record<string, number | null> = {};
-    Object.keys(tokenData.rates).forEach((exchange) => {
-      blankRates[exchange] = null;
-    });
-    rates[tokenData.token] = blankRates;
+    rates[tokenData.token] = tokenData.rates;
     lastUpdated[tokenData.token] = tokenData.lastUpdated;
   });
 
@@ -434,14 +428,15 @@ export const useFundingRatesStore = create<FundingRatesState & FundingRatesActio
             const newRateHistory: FundingRate[] = [...state.rateHistory];
             
             data.forEach((tokenData) => {
-              newRates[tokenData.token] = tokenData.rates;
-              newLastUpdated[tokenData.token] = tokenData.lastUpdated;
+              const normalizedToken = tokenData.token.toUpperCase();
+              newRates[normalizedToken] = tokenData.rates;
+              newLastUpdated[normalizedToken] = tokenData.lastUpdated;
               
               // Add to history
               Object.entries(tokenData.rates).forEach(([exchange, rate]) => {
                 if (rate !== null) {
                   newRateHistory.push({
-                    token: tokenData.token,
+                    token: normalizedToken,
                     exchange,
                     rate,
                     timestamp: tokenData.lastUpdated,

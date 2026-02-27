@@ -40,18 +40,34 @@ export default function ExplorePage({
   const { rates: fundingRates, getTokenRates, fetchLiveFundingRates, getMarketCapRank } = useFundingRatesStore();
   const { exchanges: marketExchanges, assets } = useMarketDataStore();
   const isDark = theme === 'dark';
+  const [areFundingRatesReady, setAreFundingRatesReady] = useState(false);
   
   // Fetch live funding rates on mount and set up polling
   useEffect(() => {
+    let isMounted = true;
     console.log('🟢 Fetching funding rates (initial mount)');
-    fetchLiveFundingRates();
+
+    const fetchInitialRates = async () => {
+      await Promise.all([
+        fetchLiveFundingRates(),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+      if (isMounted) {
+        setAreFundingRatesReady(true);
+      }
+    };
+
+    fetchInitialRates();
     
     const interval = setInterval(() => {
       console.log('🟡 Fetching funding rates (60s interval)');
       fetchLiveFundingRates();
     }, 60000);
     
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []); // Empty dependency array - only run on mount/unmount
   
   // Use exchanges from market data store
@@ -103,7 +119,15 @@ export default function ExplorePage({
   // Build funding data for a token from store (blank values until live API data arrives)
   const generateTokenFundingData = (token: string) => {
     // Get token rates from store
-    const tokenRates = getTokenRates(token);
+    let tokenRates = getTokenRates(token);
+    if (!tokenRates || Object.keys(tokenRates).length === 0) {
+      const matchingToken = Object.keys(fundingRates).find(
+        (storeToken) => storeToken.toUpperCase() === token.toUpperCase()
+      );
+      if (matchingToken) {
+        tokenRates = getTokenRates(matchingToken);
+      }
+    }
     
     // If token exists in store, return its data
     if (tokenRates && Object.keys(tokenRates).length > 0) {
@@ -680,18 +704,26 @@ export default function ExplorePage({
                           {/* Dynamically render cells in same order as headers */}
                           {EXCHANGES.map((exchange) => {
                             const exchangeId = exchange.id.toLowerCase();
-                            const rate = applyCapacityWeighting(row[exchangeId], exchangeId);
+                            const rawRate = applyCapacityWeighting(row[exchangeId], exchangeId);
+                            const displayRate = areFundingRatesReady ? rawRate : null;
                             const isSelected = isCellSelected(row.token, exchangeId);
-                            const cellColor = getCellColor(rate, isSelected, exchangeId);
+                            const cellColor = getCellColor(displayRate, isSelected, exchangeId);
                             
                             return (
                               <td 
                                 key={exchange.id}
                                 className={`px-3 py-2 text-center text-[13px] ${cellColor}`} 
-                                onClick={() => handleCellClick(row.token, exchangeId, rate)}
+                                onClick={() => handleCellClick(row.token, exchangeId, displayRate)}
                               >
-                                <Tooltip content={createRateTooltip(row.token, exchange.name)} position="bottom">
-                                  <div>{formatValue(rate)}</div>
+                                <Tooltip
+                                  content={
+                                    areFundingRatesReady
+                                      ? createRateTooltip(row.token, exchange.name)
+                                      : 'Loading funding rates...'
+                                  }
+                                  position="bottom"
+                                >
+                                  <div>{formatValue(displayRate)}</div>
                                 </Tooltip>
                               </td>
                             );
