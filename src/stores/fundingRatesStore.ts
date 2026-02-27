@@ -203,7 +203,7 @@ async function fetchFundingRatesFromBackend(): Promise<TokenFundingRates[]> {
     const tokenMap = new Map<string, TokenFundingRates>();
 
     data.forEach((item: any) => {
-      const token = String(item.token || item.symbol || '').toUpperCase();
+      const token = item.token || item.symbol;
       if (!token) return;
 
       if (!tokenMap.has(token)) {
@@ -428,15 +428,14 @@ export const useFundingRatesStore = create<FundingRatesState & FundingRatesActio
             const newRateHistory: FundingRate[] = [...state.rateHistory];
             
             data.forEach((tokenData) => {
-              const normalizedToken = tokenData.token.toUpperCase();
-              newRates[normalizedToken] = tokenData.rates;
-              newLastUpdated[normalizedToken] = tokenData.lastUpdated;
+              newRates[tokenData.token] = tokenData.rates;
+              newLastUpdated[tokenData.token] = tokenData.lastUpdated;
               
               // Add to history
               Object.entries(tokenData.rates).forEach(([exchange, rate]) => {
                 if (rate !== null) {
                   newRateHistory.push({
-                    token: normalizedToken,
+                    token: tokenData.token,
                     exchange,
                     rate,
                     timestamp: tokenData.lastUpdated,

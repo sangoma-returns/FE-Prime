@@ -40,34 +40,18 @@ export default function ExplorePage({
   const { rates: fundingRates, getTokenRates, fetchLiveFundingRates, getMarketCapRank } = useFundingRatesStore();
   const { exchanges: marketExchanges, assets } = useMarketDataStore();
   const isDark = theme === 'dark';
-  const [areFundingRatesReady, setAreFundingRatesReady] = useState(false);
   
   // Fetch live funding rates on mount and set up polling
   useEffect(() => {
-    let isMounted = true;
     console.log('🟢 Fetching funding rates (initial mount)');
-
-    const fetchInitialRates = async () => {
-      await Promise.all([
-        fetchLiveFundingRates(),
-        new Promise((resolve) => setTimeout(resolve, 2000)),
-      ]);
-      if (isMounted) {
-        setAreFundingRatesReady(true);
-      }
-    };
-
-    fetchInitialRates();
+    fetchLiveFundingRates();
     
     const interval = setInterval(() => {
       console.log('🟡 Fetching funding rates (60s interval)');
       fetchLiveFundingRates();
     }, 60000);
     
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []); // Empty dependency array - only run on mount/unmount
   
   // Use exchanges from market data store
@@ -116,18 +100,10 @@ export default function ExplorePage({
     }
   };
 
-  // Build funding data for a token from store (blank values until live API data arrives)
-  const generateTokenFundingData = (token: string) => {
+  // Generate mock funding data for any token from TOP_100_TOKENS
+  const generateMockFundingData = (token: string) => {
     // Get token rates from store
-    let tokenRates = getTokenRates(token);
-    if (!tokenRates || Object.keys(tokenRates).length === 0) {
-      const matchingToken = Object.keys(fundingRates).find(
-        (storeToken) => storeToken.toUpperCase() === token.toUpperCase()
-      );
-      if (matchingToken) {
-        tokenRates = getTokenRates(matchingToken);
-      }
-    }
+    const tokenRates = getTokenRates(token);
     
     // If token exists in store, return its data
     if (tokenRates && Object.keys(tokenRates).length > 0) {
@@ -145,18 +121,28 @@ export default function ExplorePage({
       };
     }
     
-    // No store data yet -> keep cells blank until fetch completes.
+    // Generate random funding rates for new tokens not in store
+    if (token === 'BTC') {
+      console.warn('⚠️ BTC not found in store, generating random data!');
+    }
+    
+    const generateRate = () => {
+      const rand = Math.random();
+      if (rand < 0.1) return null; // 10% chance of null
+      return (Math.random() * 60 - 20); // Random between -20 and 40
+    };
+    
     return {
       token,
-      hyperliquid: null,
-      paradex: null,
-      aster: null,
-      binance: null,
-      bybit: null,
-      okx: null,
-      bitget: null,
-      extended: null,
-      pacifica: null,
+      hyperliquid: generateRate(),
+      paradex: generateRate(),
+      aster: generateRate(),
+      binance: generateRate(),
+      bybit: generateRate(),
+      okx: generateRate(),
+      bitget: generateRate(),
+      extended: generateRate(),
+      pacifica: generateRate(),
     };
   };
 
@@ -165,11 +151,11 @@ export default function ExplorePage({
     ? TOP_100_TOKENS.filter(token => 
         token.toLowerCase().includes(watchlistSearch.toLowerCase()) &&
         !favorites.includes(token)
-      ).slice(0, 10).map(token => generateTokenFundingData(token)) // Limit to 10 results
+      ).slice(0, 10).map(token => generateMockFundingData(token)) // Limit to 10 results
     : [];
 
   // Get favorited pairs data
-  const favoritePairs = favorites.map(token => generateTokenFundingData(token));
+  const favoritePairs = favorites.map(token => generateMockFundingData(token));
 
   // Get live token data from centralized market data store
   const getTokenData = (token: string) => {
@@ -186,7 +172,7 @@ export default function ExplorePage({
     }
     
     // Fallback to mock data if asset not found or not loaded yet
-    const data = generateTokenFundingData(token);
+    const data = generateMockFundingData(token);
     const avgRate = Object.values(data)
       .filter(v => typeof v === 'number')
       .reduce((a: number, b) => a + (b as number), 0) / 8;
@@ -672,7 +658,7 @@ export default function ExplorePage({
                       return getMarketCapRank(a) - getMarketCapRank(b);
                     })
                     .map((token) => {
-                      const row = generateTokenFundingData(token);
+                      const row = generateMockFundingData(token);
                       
                       // Apply capacity weighting to all rates
                       const adjustedBinance = applyCapacityWeighting(row.binance, 'binance');
@@ -704,26 +690,18 @@ export default function ExplorePage({
                           {/* Dynamically render cells in same order as headers */}
                           {EXCHANGES.map((exchange) => {
                             const exchangeId = exchange.id.toLowerCase();
-                            const rawRate = applyCapacityWeighting(row[exchangeId], exchangeId);
-                            const displayRate = areFundingRatesReady ? rawRate : null;
+                            const rate = applyCapacityWeighting(row[exchangeId], exchangeId);
                             const isSelected = isCellSelected(row.token, exchangeId);
-                            const cellColor = getCellColor(displayRate, isSelected, exchangeId);
+                            const cellColor = getCellColor(rate, isSelected, exchangeId);
                             
                             return (
                               <td 
                                 key={exchange.id}
                                 className={`px-3 py-2 text-center text-[13px] ${cellColor}`} 
-                                onClick={() => handleCellClick(row.token, exchangeId, displayRate)}
+                                onClick={() => handleCellClick(row.token, exchangeId, rate)}
                               >
-                                <Tooltip
-                                  content={
-                                    areFundingRatesReady
-                                      ? createRateTooltip(row.token, exchange.name)
-                                      : 'Loading funding rates...'
-                                  }
-                                  position="bottom"
-                                >
-                                  <div>{formatValue(displayRate)}</div>
+                                <Tooltip content={createRateTooltip(row.token, exchange.name)} position="bottom">
+                                  <div>{formatValue(rate)}</div>
                                 </Tooltip>
                               </td>
                             );
