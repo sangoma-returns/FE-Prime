@@ -20,7 +20,6 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 // ============================================================================
 // MARKET CAP DATA
@@ -176,196 +175,61 @@ const EXCHANGE_MAP: Record<string, string> = {
 /**
  * Fetch funding rates from Loris API via backend proxy
  */
-async function fetchFundingRatesFromLoris(): Promise<TokenFundingRates[]> {
+/**
+ * Fetch funding rates from backend (Tread proxy)
+ */
+async function fetchFundingRatesFromBackend(): Promise<TokenFundingRates[]> {
   try {
-    // First, test if backend is alive
-    const testUrl = `https://${projectId}.supabase.co/functions/v1/make-server-9f8d65d6/test`;
-    console.log('🧪 Testing backend connection:', testUrl);
-    
-    try {
-      const testResponse = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`,
-        },
-      });
-      console.log('Test response:', testResponse.status, testResponse.statusText);
-      if (testResponse.ok) {
-        const testData = await testResponse.json();
-        console.log('✅ Backend is alive:', testData);
-      } else {
-        console.error('❌ Backend test failed:', testResponse.status);
-        console.warn('⚠️ Edge Function may not be deployed yet. Please deploy it from the Supabase dashboard.');
-        console.warn('💡 Using fallback funding rate data for now.');
-        return []; // Return empty array to use fallback
-      }
-    } catch (testError) {
-      console.error('❌ Backend unreachable:', testError);
-      console.error('⚠️ This means the Edge Function is not deployed or not responding.');
-      console.warn('💡 To deploy the Edge Function:');
-      console.warn('   1. Go to your Supabase dashboard');
-      console.warn('   2. Navigate to Edge Functions');
-      console.warn('   3. Deploy the make-server-9f8d65d6 function');
-      console.warn('💡 Using fallback funding rate data for now.');
-      return []; // Return empty array to use fallback
-    }
-    
-    const backendUrl = `https://${projectId}.supabase.co/functions/v1/make-server-9f8d65d6/funding-rates`;
-    console.log('📡 Fetching funding rates from backend:', backendUrl);
-    console.log('Project ID:', projectId);
-    console.log('Has auth key:', !!publicAnonKey);
-    
-    // Call our backend proxy (server-to-server, no CORS issues)
-    const response = await fetch(backendUrl, {
+    const response = await fetch('/api/v1/funding/rates', {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${publicAnonKey}`, // Required for Supabase Edge Functions
       },
     });
-    
-    console.log('Backend response status:', response.status, response.statusText);
-    
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Backend proxy error:', response.status, errorText);
-      console.error('This typically means:');
-      console.error('1. Edge Function is not deployed yet');
-      console.error('2. There is a backend error');
-      console.error('3. Network/CORS issue');
-      console.warn('💡 Using fallback funding rate data for now.');
-      return []; // Return empty array to use fallback
-    }
-    
-    const data = await response.json();
-    console.log(`✓ Received Loris API data with keys:`, Object.keys(data).join(', '));
-    
-    // Parse the Loris API response format
-    // Structure: { funding_rates: { exchange: { symbol: rateInBps, ... }, ... }, symbols: [...], ... }
-    if (!data.funding_rates || typeof data.funding_rates !== 'object') {
-      console.warn('Unexpected Loris API response structure:', data);
+      console.error(`❌ Funding rates API error: ${response.status}`);
       return [];
     }
-    
-    const fundingRates = data.funding_rates;
-    const tokenRatesMap = new Map<string, { rates: Record<string, number>, normalizedRates: Record<string, NormalizedFundingRates> }>();
-    
-    // Exchanges that use 1-hour funding intervals (noted in API docs)
-    const ONE_HOUR_EXCHANGES = ['extended', 'hyperliquid', 'lighter', 'vest'];
-    
-    // Log which exchanges we got from Loris
-    const lorisExchanges = Object.keys(fundingRates);
-    console.log(`📊 Loris API exchanges:`, lorisExchanges.join(', '));
-    
-    // Check which of our exchanges are missing from Loris
-    const ourExchanges = Object.keys(EXCHANGE_MAP);
-    const missingExchanges = ourExchanges.filter(ex => !lorisExchanges.includes(ex));
-    if (missingExchanges.length > 0) {
-      console.warn(`⚠️ These exchanges are NOT in Loris API:`, missingExchanges.join(', '));
+
+    const payload = await response.json();
+    const data = Array.isArray(payload?.data) ? payload.data : payload;
+
+    if (!Array.isArray(data)) {
+      console.warn('⚠️ Funding rates API returned unexpected format:', payload);
+      return [];
     }
-    
-    // Iterate through exchanges
-    Object.entries(fundingRates).forEach(([exchange, symbols]) => {
-      const normalizedExchange = EXCHANGE_MAP[exchange.toLowerCase()] || exchange;
-      const isOneHourInterval = ONE_HOUR_EXCHANGES.includes(exchange.toLowerCase());
-      
-      console.log(`Processing exchange: ${exchange} → ${normalizedExchange} (${isOneHourInterval ? '1hr' : '8hr'} interval)`);
-      
-      // Iterate through symbols for this exchange
-      if (typeof symbols === 'object' && symbols !== null) {
-        const symbolCount = Object.keys(symbols as object).length;
-        console.log(`  ${symbolCount} symbols found for ${normalizedExchange}`);
-        
-        Object.entries(symbols as Record<string, number>).forEach(([symbol, apiValue]) => {
-          // Loris API: "a value of 25 represents 0.0025 or 0.25%"
-          // So API value / 10000 = percentage rate for one funding interval
-          // Example: API returns 25 → 25/10000 = 0.0025 = 0.25% per 8hr interval
-          
-          const rawRate = apiValue; // Raw value from API
-          
-          // Calculate the 8hr funding rate percentage
-          // For 8hr exchanges: apiValue is the actual 8hr rate
-          // For 1hr exchanges: apiValue has been normalized to 8hr equivalent (multiplied by 8)
-          let eightHourRatePercent: number;
-          let oneHourRatePercent: number;
-          
-          if (isOneHourInterval) {
-            // For 1hr exchanges, API already normalized by multiplying by 8
-            // So divide by 8 to get the actual 1hr rate
-            oneHourRatePercent = (apiValue / 10000) / 8;
-            eightHourRatePercent = apiValue / 10000; // The normalized 8hr equivalent
-          } else {
-            // For 8hr exchanges
-            eightHourRatePercent = apiValue / 10000;
-            oneHourRatePercent = eightHourRatePercent / 8;
-          }
-          
-          // Calculate daily and yearly rates
-          const dailyRatePercent = eightHourRatePercent * 3; // 3 funding periods per day
-          const yearlyRatePercent = dailyRatePercent * 365; // Annualized
-          
-          // Convert to percentage values (multiply by 100)
-          const yearlyAPY = yearlyRatePercent * 100;
-          
-          // Debug logging for first few symbols
-          if (symbol === 'BTC' || symbol === 'ETH') {
-            console.log(`  📊 ${symbol} on ${normalizedExchange}:`);
-            console.log(`     Raw API value: ${apiValue}`);
-            console.log(`     8hr rate: ${(eightHourRatePercent * 100).toFixed(4)}%`);
-            console.log(`     Daily rate: ${(dailyRatePercent * 100).toFixed(4)}%`);
-            console.log(`     Yearly APY: ${yearlyAPY.toFixed(2)}%`);
-          }
-          
-          // Normalize symbol (remove USDT, PERP, separators)
-          const normalizedSymbol = symbol.toUpperCase()
-            .replace('USDT', '')
-            .replace('PERP', '')
-            .replace('-', '')
-            .replace('_', '')
-            .replace('USD', '')
-            .replace('USDC', '');
-          
-          if (!tokenRatesMap.has(normalizedSymbol)) {
-            tokenRatesMap.set(normalizedSymbol, { rates: {}, normalizedRates: {} });
-          }
-          
-          const tokenData = tokenRatesMap.get(normalizedSymbol)!;
-          tokenData.rates[normalizedExchange] = dailyRatePercent * 100; // Store as daily percentage
-          tokenData.normalizedRates[normalizedExchange] = {
-            raw: rawRate,
-            oneHour: oneHourRatePercent * 100, // Convert to %
-            eightHour: eightHourRatePercent * 100, // Convert to %
-            daily: dailyRatePercent * 100, // Convert to %
-            yearly: yearlyAPY,
-          };
+
+    const tokenMap = new Map<string, TokenFundingRates>();
+
+    data.forEach((item: any) => {
+      const token = item.token || item.symbol;
+      if (!token) return;
+
+      if (!tokenMap.has(token)) {
+        tokenMap.set(token, {
+          token,
+          rates: {},
+          normalizedRates: {},
+          lastUpdated: Date.now(),
         });
       }
-    });
-    
-    // Convert map to array format
-    const result: TokenFundingRates[] = [];
-    const timestamp = Date.now();
-    
-    tokenRatesMap.forEach((data, token) => {
-      result.push({
-        token,
-        rates: data.rates,
-        normalizedRates: data.normalizedRates,
-        lastUpdated: timestamp,
+
+      const tokenData = tokenMap.get(token)!;
+      const exchanges = item.exchanges || {};
+
+      Object.entries(exchanges).forEach(([exchangeId, details]) => {
+        if (!details) return;
+        const exchangeKey = exchangeId.toLowerCase();
+        const exchangeName = EXCHANGE_MAP[exchangeKey] || exchangeId;
+        const rate = (details as any).rateAnnualized ?? (details as any).rate ?? null;
+        tokenData.rates[exchangeName] = rate;
       });
     });
-    
-    console.log(`✓ Transformed to ${result.length} tokens with funding rates`);
-    if (result.length > 0) {
-      console.log('Sample token:', result[0]);
-    }
-    
-    return result;
+
+    return Array.from(tokenMap.values());
   } catch (error) {
-    // Network error or backend unavailable
-    console.error('Error fetching funding rates from backend:', error);
-    console.info('💡 Using fallback funding rate data.');
+    console.error('❌ Error fetching funding rates:', error);
     return [];
   }
 }
@@ -492,17 +356,13 @@ const INITIAL_FUNDING_DATA: TokenFundingRates[] = [
   { token: 'LTC', rates: { Binance: 3.789, Bybit: 2.456, OKX: 4.234, Hyperliquid: 3.567, Bitget: 2.123, Paradex: 3.234 }, lastUpdated: Date.now() },
 ];
 
-// Convert initial data to rates structure
 const buildInitialRates = () => {
-  const rates: Record<string, Record<string, number | null>> = {};
-  const lastUpdated: Record<string, number> = {};
-  
-  INITIAL_FUNDING_DATA.forEach((tokenData) => {
-    rates[tokenData.token] = tokenData.rates;
-    lastUpdated[tokenData.token] = tokenData.lastUpdated;
-  });
-  
-  return { rates, lastUpdated };
+  // Start with blank state so UI doesn't flash stale/mock funding values
+  // before live data is fetched from the API.
+  return {
+    rates: {} as Record<string, Record<string, number | null>>,
+    lastUpdated: {} as Record<string, number>,
+  };
 };
 
 const { rates: initialRates, lastUpdated: initialLastUpdated } = buildInitialRates();
@@ -629,16 +489,16 @@ export const useFundingRatesStore = create<FundingRatesState & FundingRatesActio
         ),
 
       fetchLiveFundingRates: async () => {
-        console.log('🔄 Fetching live funding rates from Loris API...');
-        const data = await fetchFundingRatesFromLoris();
+        console.log('🔄 Fetching live funding rates from Tread API...');
+        const data = await fetchFundingRatesFromBackend();
         
         if (data.length > 0) {
-          console.log(`✓ Received ${data.length} tokens from Loris API, updating store...`);
+          console.log(`✓ Received ${data.length} tokens from Tread API, updating store...`);
           // Update rates directly without clearing first to avoid flickering to mock data
           get().updateAllRates(data);
           console.log(`✓ Store updated successfully`);
         } else {
-          console.warn('⚠ No funding rate data received from Loris API');
+          console.warn('⚠ No funding rate data received from Tread API');
         }
       },
     }),

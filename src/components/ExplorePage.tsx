@@ -100,8 +100,8 @@ export default function ExplorePage({
     }
   };
 
-  // Generate mock funding data for any token from TOP_100_TOKENS
-  const generateMockFundingData = (token: string) => {
+  // Build funding data for a token from store (blank values until live API data arrives)
+  const generateTokenFundingData = (token: string) => {
     // Get token rates from store
     const tokenRates = getTokenRates(token);
     
@@ -121,28 +121,18 @@ export default function ExplorePage({
       };
     }
     
-    // Generate random funding rates for new tokens not in store
-    if (token === 'BTC') {
-      console.warn('⚠️ BTC not found in store, generating random data!');
-    }
-    
-    const generateRate = () => {
-      const rand = Math.random();
-      if (rand < 0.1) return null; // 10% chance of null
-      return (Math.random() * 60 - 20); // Random between -20 and 40
-    };
-    
+    // No store data yet -> keep cells blank until fetch completes.
     return {
       token,
-      hyperliquid: generateRate(),
-      paradex: generateRate(),
-      aster: generateRate(),
-      binance: generateRate(),
-      bybit: generateRate(),
-      okx: generateRate(),
-      bitget: generateRate(),
-      extended: generateRate(),
-      pacifica: generateRate(),
+      hyperliquid: null,
+      paradex: null,
+      aster: null,
+      binance: null,
+      bybit: null,
+      okx: null,
+      bitget: null,
+      extended: null,
+      pacifica: null,
     };
   };
 
@@ -151,11 +141,11 @@ export default function ExplorePage({
     ? TOP_100_TOKENS.filter(token => 
         token.toLowerCase().includes(watchlistSearch.toLowerCase()) &&
         !favorites.includes(token)
-      ).slice(0, 10).map(token => generateMockFundingData(token)) // Limit to 10 results
+      ).slice(0, 10).map(token => generateTokenFundingData(token)) // Limit to 10 results
     : [];
 
   // Get favorited pairs data
-  const favoritePairs = favorites.map(token => generateMockFundingData(token));
+  const favoritePairs = favorites.map(token => generateTokenFundingData(token));
 
   // Get live token data from centralized market data store
   const getTokenData = (token: string) => {
@@ -172,7 +162,7 @@ export default function ExplorePage({
     }
     
     // Fallback to mock data if asset not found or not loaded yet
-    const data = generateMockFundingData(token);
+    const data = generateTokenFundingData(token);
     const avgRate = Object.values(data)
       .filter(v => typeof v === 'number')
       .reduce((a: number, b) => a + (b as number), 0) / 8;
@@ -658,7 +648,7 @@ export default function ExplorePage({
                       return getMarketCapRank(a) - getMarketCapRank(b);
                     })
                     .map((token) => {
-                      const row = generateMockFundingData(token);
+                      const row = generateTokenFundingData(token);
                       
                       // Apply capacity weighting to all rates
                       const adjustedBinance = applyCapacityWeighting(row.binance, 'binance');
