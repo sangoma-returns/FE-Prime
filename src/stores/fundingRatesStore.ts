@@ -357,12 +357,21 @@ const INITIAL_FUNDING_DATA: TokenFundingRates[] = [
 ];
 
 const buildInitialRates = () => {
-  // Start with blank state so UI doesn't flash stale/mock funding values
-  // before live data is fetched from the API.
-  return {
-    rates: {} as Record<string, Record<string, number | null>>,
-    lastUpdated: {} as Record<string, number>,
-  };
+  // Keep token rows visible, but start all exchange rates as null so
+  // the UI stays blank until live data is fetched.
+  const rates: Record<string, Record<string, number | null>> = {};
+  const lastUpdated: Record<string, number> = {};
+
+  INITIAL_FUNDING_DATA.forEach((tokenData) => {
+    const blankRates: Record<string, number | null> = {};
+    Object.keys(tokenData.rates).forEach((exchange) => {
+      blankRates[exchange] = null;
+    });
+    rates[tokenData.token] = blankRates;
+    lastUpdated[tokenData.token] = tokenData.lastUpdated;
+  });
+
+  return { rates, lastUpdated };
 };
 
 const { rates: initialRates, lastUpdated: initialLastUpdated } = buildInitialRates();
