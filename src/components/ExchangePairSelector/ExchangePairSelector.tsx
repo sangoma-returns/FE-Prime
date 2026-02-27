@@ -28,6 +28,15 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
     name: ex.name,
     icon: ['💧', '◈', '✦', '⬡', '⬢', '○'][index] || '○', // Use default icons
   }));
+  const normalizedEnabledExchanges = enabledExchanges?.map(e => e.toLowerCase()) || [];
+  const visibleExchanges = EXCHANGES.filter((exchange) => {
+    if (normalizedEnabledExchanges.length === 0) return true;
+    return (
+      normalizedEnabledExchanges.includes(exchange.id.toLowerCase()) ||
+      normalizedEnabledExchanges.includes(exchange.name.toLowerCase())
+    );
+  });
+  const allowedExchangeIds = new Set(visibleExchanges.map(exchange => exchange.id.toLowerCase()));
   
   // HIP-3 DEXs (includes RWA and crypto DEXs)
   const RWA_DEXS = [
@@ -89,10 +98,10 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
       { ...baseData, pair: `${asset.symbol}:PERP-USDT`, exchanges: ['paradex', 'aster', 'binance', 'bybit', 'okx'] },
       { ...baseData, pair: `${asset.symbol}/USDT`, exchanges: ['paradex', 'aster', 'binance', 'bybit', 'okx'] },
     ];
+  }).filter((pair) => {
+    if (allowedExchangeIds.size === 0) return true;
+    return pair.exchanges.some((exchange) => allowedExchangeIds.has(exchange.toLowerCase()));
   });
-  
-  // Normalize enabledExchanges to lowercase for comparison
-  const normalizedEnabledExchanges = enabledExchanges?.map(e => e.toLowerCase()) || [];
   
   const handleExchangeSelect = (exchangeId: string) => {
     onSelect(exchangeId, '');
@@ -264,8 +273,8 @@ export function ExchangePairSelector({ onSelect, onClose, mode, currentExchange,
           {/* Exchange Filter Chips */}
           <div className={`border-b ${colors.border.primary} px-4 py-3`}>
             <div className="flex flex-wrap gap-2">
-              {(activeCategory === 'rwas' ? RWA_DEXS : EXCHANGES).map((exchange) => {
-                const isEnabled = activeCategory === 'rwas' || !enabledExchanges || enabledExchanges.length === 0 || normalizedEnabledExchanges.includes(exchange.id.toLowerCase());
+              {(activeCategory === 'rwas' ? RWA_DEXS : visibleExchanges).map((exchange) => {
+                const isEnabled = activeCategory === 'rwas' || true;
                 const isSelected = selectedExchangeFilter.includes(exchange.id);
                 const isRWADex = activeCategory === 'rwas';
                 
