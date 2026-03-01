@@ -1,816 +1,641 @@
 # Detailed Component Specificiation
 
-## 1. Scope and intent
-This document is an exhaustive frontend component specification for the current code in this repository.
+## 1. Scope and Audit Basis
+This document is a code-verified frontend specification for:
 
-It is designed to support backend implementation by explicitly documenting:
-- Every page-level and shared FE component.
-- Every major interactive control path (button/input -> handler -> state/service calls -> system impact).
-- Which interactions are currently UI-only vs. which already call APIs/stores.
-- Full exported component inventory (including UI primitives).
+- `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp`
 
-Conventions used below:
-- `UI Control`: visible button/input/toggle/list action.
-- `Handler`: function directly bound in JSX.
-- `Calls`: store methods / hooks / API functions.
-- `Impact`: resulting state mutation, side effect, navigation, or backend write.
+Audit basis used for this update:
 
----
+- Runtime page components and shared components in `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components`
+- Orchestration hooks/stores in `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/hooks` and `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/stores`
+- API service callsites in `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/services/api`
 
-## 2. Application shell and routing
+Conventions used:
 
-### `src/main.tsx`
-Component(s): bootstrap render pipeline.
-
-Role:
-- Mounts React into `#root`.
-- Wraps app with `React.StrictMode` and `ErrorBoundary`.
-- Imports global CSS (`src/styles/globals.css`).
-
-Impact:
-- Any render/runtime exception under the tree bubbles to `ErrorBoundary`.
-
-### `src/App.tsx`
-Component(s): `App`, internal `AppContent`.
-
-Role:
-- Top-level orchestrator for wallet/session/navigation/modals/page routing.
-
-State and stores read:
-- `useAppStore`: deposit, exchange setup, orders, preselected trade, strategies, history, balances, volume.
-- `useAuthStore`: auth session state.
-- `useMockWallet`: wallet connection state.
-
-Main effects:
-- Restores 24h session cache via `loadSession()`.
-- Persists app/auth/wallet snapshots via `saveSession()` (debounced 300ms).
-- Clears app wallet state on disconnect transitions.
-- Syncs selected exchanges to `useMarketDataStore.setExchanges(...)`.
-- Loads initial market data with `useMarketDataStore.refreshAllAssets()`.
-
-Key handlers and impacts:
-- `handleDisconnect` -> `disconnect()` + `disconnectWallet()` + `clearSession()`.
-- `handleDeposit(amount)` -> best-effort `depositPortfolio(amount)` -> onboarding deposit path or direct deposit update.
-- `handleWithdraw(amount)` -> `updateDepositAmount(max(0, depositAmount-amount))`.
-- `handleTransfer(exchange, amount, direction)` -> `transferFunds(...)` + vault balance adjustment.
-- `handleOrderCreate(orderRequest)` -> delegated to `useOrderManagement.handleCreateOrder`.
-- `handleNavigateToStrategy(strategyId)` -> route to `/portfolio?strategyId=...`.
-
-### `src/components/AppRouter/AppRouter.tsx`
-Component(s): `AppRouter`.
-
-Role:
-- URL-path router using `window.location.pathname`.
-- Handles page rendering for:
-  - `/explore`
-  - `/aggregator`
-  - `/trade`
-  - `/market-maker`
-  - `/portfolio`
-  - `/more`
-  - `/blockchain-explorer`
-
-Key behavior:
-- Subscribes to `popstate` and custom `navigation` event.
-- Patches `history.pushState` / `history.replaceState` to trigger local route updates.
-- Parses query params for portfolio strategy deep-linking.
-
-### `src/components/Navigation/Navigation.tsx`
-Component(s): `Navigation`.
-
-Role:
-- Global top nav bar and account controls.
-
-UI controls:
-- Page tabs (`Explore`, `Aggregator`, `Market Maker`, `Carry`, `Portfolio`) -> `onNavigate(page)`.
-- `More` dropdown:
-  - `Explorer` -> manual `history.pushState('/blockchain-explorer')` + `popstate` dispatch.
-  - `Documentation` -> external link.
-- Theme button -> `useThemeStore.toggleTheme()`.
-- `Disconnect` -> parent `onDisconnect`.
-- Notifications bell -> local dropdown state only.
-
-System impact:
-- Navigation changes route and page component.
-- Theme toggle changes global theme store.
-- Wallet disconnect clears wallet/auth/session via parent handler.
-
-### `src/components/AppModals/AppModals.tsx`
-Component(s): `AppModals`.
-
-Role:
-- Centralized modal renderer.
-
-Rendered modal map:
-- `login` -> `LoginModal` (only when wallet disconnected).
-- `deposit` -> `DepositModal`.
-- `withdraw` -> `WithdrawModal`.
-- `transfer` -> `TransferModal`.
-- `exchangeSelection` -> `ExchangeSelectionModal`.
-
-System impact:
-- Delegates all callbacks to parent (`App.tsx`) handlers.
+- `UI Control`: clickable/editable control in JSX.
+- `Handler`: function/state setter bound by `onClick`, `onChange`, etc.
+- `Calls`: store methods, hooks, or API calls invoked by that action.
+- `Impact`: resulting FE state changes, route changes, and backend writes.
+- `unknown`: FE does not define reliable formula/logic in code.
 
 ---
 
-## 3. Cross-cutting wallet/auth components
+## 2. FE vs Previous Document Diff (Verified Corrections)
 
-### `src/contexts/MockWalletContext.tsx`
-Component(s): `MockWalletProvider`, hook `useMockWallet`.
-
-Role:
-- Demo wallet provider for connect/disconnect with static mock address.
-
-Calls/impact:
-- `connect()` sets address.
-- `disconnect()` clears address.
-- `isConnected` derived from address truthiness.
-
-### `src/components/CustomConnectButton/CustomConnectButton.tsx`
-Component(s): `CustomConnectButton`.
-
-Role:
-- Active wallet connect UI used in navigation and login modal.
-
-UI controls:
-- `Connect Wallet` -> `handleConnect()`.
-- Menu toggle -> show account dropdown.
-- `Copy Address` -> clipboard write.
-- `Disconnect` -> `handleDisconnect()`.
-
-Calls and impact:
-- `handleConnect` -> `useMockWallet.connect()` -> `useAuthStore.setUser(...)` + `setStatus('authenticated')` + toast.
-- `handleDisconnect` -> `useMockWallet.disconnect()` + `useAuthStore.setUser(null)` + `setStatus('unauthenticated')` + toast.
-
-### Legacy wallet/auth components (kept for compatibility)
-
-`src/components/ConnectButton.tsx`
-- Older connect dropdown; not current primary path.
-- Uses `useMockWallet` and local dropdown state.
-
-`src/components/SiwePrompt.tsx`
-- Legacy SIWE-like prompt; not currently rendered in active flow.
-- Auto-authenticates through `useAuthStore` when wallet connected.
+| Area | Previous statement (or ambiguity) | Actual FE behavior now |
+|---|---|---|
+| Session cache TTL | Not always explicit in all sections | `24 hours` (`SESSION_TTL_MS = 24 * 60 * 60 * 1000`) in `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/utils/sessionCache.ts` |
+| Routing events | Could read as single event source | Routing updates from `useNavigation` custom event and `AppRouter` listeners/patches (`popstate`, `navigation`, patched `pushState/replaceState`) |
+| More -> Explorer nav | Ambiguous | Uses direct `window.history.pushState('/blockchain-explorer')` and dispatches `PopStateEvent('popstate')` in `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/Navigation/Navigation.tsx` |
+| Aggregator exchanges | Previously broad exchange wording | Aggregator enforces `SUPPORTED_EXCHANGE = 'Hyperliquid'`; exchange toggle ignores non-Hyperliquid selections |
+| Carry exchanges | Could be interpreted as multi-exchange | Carry page hardcodes `SUPPORTED_EXCHANGES = ['Hyperliquid']` for selectors |
+| Market Maker exchanges | Could be interpreted as multi-exchange execution | Active runtime page constrains advanced strategy exchange list to Hyperliquid (`EXCHANGES = [SUPPORTED_EXCHANGE]`) |
+| Aggregator amount fields | Earlier summary too high-level | Mutual lock implemented: BTC input disabled if USDC has value; USDC input disabled if BTC has value |
+| Aggregator input type | Could imply unconstrained text | Numeric sanitization via `sanitizeNumberInput`; `inputMode='decimal'`; regex-like pattern hint in inputs |
+| Aggregator leverage | Not always explicit | Slider is `min=1`, `max=50`, `step=1`, label `x` |
+| Aggregator confirmation modal | Missing fields in older spec | Includes `USDC Amount`, `Leverage`, and `Position Amount = usdtAmount * leverage` |
+| Aggregator volume semantics | Partially documented | History volume written as `usdcNotional * leverage * (arbitrage ? 2 : 1)` |
+| Carry volume semantics | Not explicit in all sections | On confirm: `totalVolume = buyQty*buyLev + sellQty*sellLev`; added via `addVolume(totalVolume)` and history entry `volume` |
+| Carry navigation after execute | Previously generic | Explicit navigation to `/portfolio?tab=history&trade=multi&detailTab=execution` |
+| Market Maker Start button behavior | Previously ambiguous due older bug reports | Advanced tab `Start Market Making` creates strategy, adds order/trade, then calls `onNavigateToStrategy(strategyId)` |
+| TradeHistory source | Previously simplified | Trade list merges backend `/api/v1/orders`, `tradesStore.history`, `appStore.tradeHistory`, and `MOCK_TRADES` |
+| Trade detail target notional columns | Not fully spelled out | Left `Target Notional` = `leverage x quantity USDC`; right `Target Notional` = `quantity * leverage` |
+| Portfolio top cards | Could look backend-only | Uses computed FE values first, then backend fallback when computed values are zero/empty |
+| Directional bias | Previously broad | Computed from live leg exposures `quantity * entryPrice * leverage`, then `net / totalEquity * 100`, with backend fallback |
+| Portfolio volume card | Could appear backend-only | Uses `history.filter(type='trade').reduce(sum volume)` first; backend fallback if computed volume is 0 |
+| Portfolio charts | Previously partially marked | Several are static/mock/hardcoded (see Graph Spec) and do not represent live backend data |
+| ExchangeExecutionChart | Previously could be mistaken as execution-derived | Synthetic randomized curves generated in `useMemo`; not sourced from fills |
+| StrategyMonitor charts | Previously could be mistaken as live | Fully simulated correlated series from local generator; no backend fills used |
+| Reset account | Previously high-level | `resetPortfolio()` (best effort), `clearAllTrades()`, `clearPositions()`, `disconnectWallet()`, `clearSession()`, clear local summary/tab |
+| Login modal | Could be interpreted as automatic auth gate | Rendered only when `modals.login` and wallet disconnected; active navigation mostly uses top-right connect button |
+| ExchangeSelection onboarding | Needed precision | Selector shows multiple exchanges, but only `hyperliquid`/`paradex` togglable; allocations locked at 50/50 with disabled sliders |
 
 ---
 
-## 4. Modal components
+## 3. Application Shell and Component Interaction Map
 
-### `src/components/LoginModal/LoginModal.tsx`
-Component(s): `LoginModal`.
+### 3.1 Root Mount and Crash Handling
+- File: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/main.tsx`
+- `ReactDOM.createRoot(...).render(...)` wraps `App` in `ErrorBoundary` + `React.StrictMode`.
+- Any uncaught render/runtime exception is surfaced by root boundary UI.
 
-Role:
-- Blocking modal requesting wallet connection.
+### 3.2 Top-Level Orchestrator (`App.tsx`) Interaction Chains
 
-UI control:
-- Renders `CustomConnectButton` only; connect action handled there.
+**Chain: session restore on initial load**
+1. `AppContent` mounts.
+2. `loadSession()` reads `localStorage` `bitfrost_session_v1`.
+3. If valid and not expired:
+- wallet reconnect attempted via `connect()`.
+- `useAuthStore.setState(...)` with cached auth snapshot.
+- `useAppStore.setState(...)` with cached app snapshot.
 
-### `src/components/DepositModal/DepositModal.tsx`
-Component(s): `DepositModal`.
+**Chain: session persistence**
+1. App/auth/wallet state dependencies change.
+2. 300ms debounce timer.
+3. `saveSession({ appState, authState, walletConnected })`.
 
-UI controls and impacts:
-- Amount input -> local `amount` state.
-- Preset buttons (`$100/$500/$1000/$5000`) -> set `amount`.
-- `Deposit & Continue` -> `handleDeposit()` -> `onDeposit(parsedAmount)`.
+**Chain: disconnect**
+1. Nav `Disconnect` click.
+2. `handleDisconnect` in `App.tsx`.
+3. Calls `disconnect()`, `disconnectWallet()`, `clearSession()`.
+4. UI returns to disconnected state.
 
-Backend/system impact path:
-- Parent `App.tsx` then runs `depositPortfolio(amount)` (best effort) and updates app store onboarding/deposit state.
+**Chain: onboarding first deposit**
+1. `DepositModal` submit -> `onDeposit(amount)`.
+2. `App.handleDeposit` best-effort calls backend `depositPortfolio(amount)`.
+3. If first deposit (`hasDeposited === false`):
+- `useOnboarding.handleDeposit` -> `completeDeposit(amount)`.
+- closes deposit modal.
+- opens `exchangeSelection` modal.
+4. Exchange modal `Initialize Accounts` -> `setupExchanges(exchanges)`.
 
-### `src/components/WithdrawModal/WithdrawModal.tsx`
-Component(s): `WithdrawModal`.
+**Chain: route changes**
+- `Navigation` uses `onNavigate(page)` from `useNavigation` for major tabs.
+- `useNavigation.navigateTo` does `pushState` and dispatches `navigation` event.
+- `AppRouter` also listens to `popstate` and patched history methods.
 
-UI controls and impacts:
-- Amount input with max bound.
-- Preset buttons capped by `maxAmount`.
-- `Withdraw & Continue` -> `onWithdraw(parsedAmount)`.
-
-System impact path:
-- Parent reduces `depositAmount` in app store.
-
-### `src/components/TransferModal/TransferModal.tsx`
-Component(s): `TransferModal`.
-
-UI controls and impacts:
-- Direction toggle (`fromExchange` <-> `toExchange`) -> resets amount.
-- Exchange select -> local selected exchange.
-- Amount input, `Max`, percent quick buttons.
-- `Transfer` -> `onTransfer(exchange, amount, direction)`.
-
-System impact path:
-- Parent applies `transferFunds(...)` + vault balance adjustment.
-
-### `src/components/ExchangeSelectionModal/ExchangeSelectionModal.tsx`
-Component(s): `ExchangeSelectionModal`.
-
-Role:
-- Onboarding exchange selection/allocation.
-
-Current behavior:
-- Allowed toggles limited to `hyperliquid` and `paradex`.
-- `Continue to Allocation` forces 50/50 allocation split.
-- Allocation sliders currently disabled (`Coming soon` tooltip).
-
-UI controls and impacts:
-- Exchange tile -> `toggleExchange(exchangeId)`.
-- `Continue to Allocation` -> `handleContinue()`.
-- `Back` -> step reset to selection.
-- `Initialize Accounts` -> `onComplete(selectedExchanges)`.
-
-System impact path:
-- Parent calls exchange setup (`useAppStore.setupExchanges`).
+### 3.3 Router Map (`AppRouter`)
+- `/explore` -> `ExplorePage`
+- `/aggregator` -> `AggregatorPage`
+- `/trade` -> `FundingRateArbPage`
+- `/market-maker` -> `MarketMakerPage`
+- `/portfolio` -> `PortfolioPage`
+- `/more` -> `MorePage`
+- `/blockchain-explorer` -> `BlockchainExplorerPage`
 
 ---
 
-## 5. Explore page (`/explore`)
+## 4. Global Navigation and Modal Controls
 
-### `src/components/ExplorePage.tsx`
-Component(s): `ExplorePage`.
-Used shared: `Tooltip`.
+### 4.1 Navigation (`/src/components/Navigation/Navigation.tsx`)
 
-Role:
-- Funding Yield Explorer with watchlist + funding rate matrix.
+| UI Control | Handler / State | Calls | Impact |
+|---|---|---|---|
+| `Explore` tab | `onClick -> onNavigate('explore')` | `useNavigation.navigateTo` | URL to `/explore`; page rerender |
+| `Aggregator` tab | `onNavigate('aggregator')` | same | URL to `/aggregator` |
+| `Market Maker` tab | `onNavigate('market-maker')` | same | URL to `/market-maker` |
+| `Carry` tab | `onNavigate('funding-arb')` | same | URL to `/trade` |
+| `Portfolio` tab | `onNavigate('portfolio')` | same | URL to `/portfolio` |
+| `More` button | `setShowMoreDropdown(!)` | local state | opens/closes dropdown |
+| Dropdown `Explorer` | direct `pushState('/blockchain-explorer')` + dispatch `popstate` | browser history | route to explorer page |
+| Dropdown `Documentation` | anchor external link | browser navigation | opens GitBook |
+| Dropdown `API`/`Settings` | disabled buttons | none | UI-only, no side effect |
+| Connected badge | no click handler | none | display-only |
+| `Disconnect` | `onDisconnect` | `App.handleDisconnect` chain | clears wallet/app session |
+| Theme button | `toggleTheme()` | `useThemeStore` | global theme toggle |
+| Bell notifications | toggles `showNotifications` | local state | shows notification dropdown |
+| Notification row | `handleNotificationClick(id)` | local state | marks row as read |
+| `View all notifications` | button with no bound callback | none | UI-only |
 
-Data dependencies:
-- `useFundingRatesStore`: `rates`, `getTokenRates`, `fetchLiveFundingRates`, `getMarketCapRank`.
-- `useMarketDataStore`: exchanges/assets for watchlist prices and volume.
+### 4.2 Modal Host (`/src/components/AppModals/AppModals.tsx`)
 
-Polling:
-- Fetch funding rates on mount and every 60s.
+| Modal key | Render condition | Primary callback target |
+|---|---|---|
+| `login` | `modals.login && !isWalletConnected` | wallet connect via `CustomConnectButton` |
+| `deposit` | `modals.deposit` | `App.handleDeposit` |
+| `withdraw` | `modals.withdraw` | `App.handleWithdraw` |
+| `transfer` | `modals.transfer` | `App.handleTransfer` |
+| `exchangeSelection` | `modals.exchangeSelection` | `App.handleExchangeSetup` |
 
-Major UI controls and impacts:
-- Watchlist sort buttons (`Volume`, `Price`) -> `setSortBy` (UI-only sorting).
-- Watchlist search input -> `setWatchlistSearch`.
-- Search result click -> `toggleFavorite(token)`.
-- Favorite row click -> `handleFavoriteClick(token)` (sets token filter).
-- Star icon -> `toggleFavorite(token)`.
-- Main search input -> `setSearchQuery` for table filtering.
-- Capacity weighting input -> numeric validation + `setCapacityWeightedValue`.
-- Timeframe tabs (`Day/Week/Month/Year`) -> `setTimeframe` and display conversion.
-- Funding matrix cell click -> `handleCellClick(token, exchange, rate)`:
-  - Maintains up to two selected cells.
-  - On second valid selection calls `onTradeSelect(buyCell, sellCell)` with arbitrage ordering (lower funding buy, higher funding sell).
+### 4.3 Modal Control Details
 
-Backend/system impact:
-- No direct backend writes.
-- Can trigger route transition to Carry flow through parent `onTradeSelect`.
+**Deposit modal** (`/src/components/DepositModal/DepositModal.tsx`)
+- Amount input (`type=number`), presets `$100/$500/$1000/$5000`.
+- `Deposit & Continue`:
+- parses amount.
+- calls `onDeposit(parsedAmount)` only if `parsedAmount > 0`.
 
----
+**Withdraw modal** (`/src/components/WithdrawModal/WithdrawModal.tsx`)
+- Amount input with `max=maxAmount`.
+- Presets capped by available max.
+- `Withdraw & Continue` calls `onWithdraw(parsedAmount)` only when `0 < amount <= maxAmount`.
 
-## 6. Aggregator page (`/aggregator`)
+**Transfer modal** (`/src/components/TransferModal/TransferModal.tsx`)
+- Direction toggle (`fromExchange`/`toExchange`) resets amount.
+- Exchange selector restricted to currently selected exchanges from app store.
+- `Max` and `%` quick-fill buttons.
+- `Transfer` calls `onTransfer(exchange, amount, direction)` if amount valid and within computed max.
 
-### `src/components/AggregatorPage.tsx`
-Component(s): `AggregatorPage`.
-Used shared: `TradingChart`, `OrdersSection`, `TradeHistory`, `Tooltip`.
+**Exchange selection modal** (`/src/components/ExchangeSelectionModal/ExchangeSelectionModal.tsx`)
+- Exchange list renders many options, but only IDs in `ALLOWED_EXCHANGES=['hyperliquid','paradex']` are selectable.
+- Defaults selected: `['hyperliquid','paradex']`.
+- `Continue to Allocation` requires at least 2 exchanges then hard-sets allocation to 50/50.
+- Allocation sliders are disabled (tooltip `Coming soon`).
+- `Initialize Accounts` calls `onComplete(selectedExchanges)` only if total allocation is ~100.
 
-Role:
-- Single-order execution builder with crypto + HIP-3/RWA support.
-
-Core local state domains:
-- Asset selection (`assetType`, `selectedAsset`, RWA category/dex filters).
-- Execution config (side, exchange, strategy, quantity/USDC, leverage, duration, trajectory, flags, exit conditions).
-- Live market data (`orderBook`, `ticker24h`, `marketMetrics`, `solverData`).
-- Template management (`savedTemplates`, save/load modal states).
-
-Key service/store dependencies:
-- Stores: `useAppStore`, `useTradesStore`, `usePricesStore`, `useMarketDataStore`, `usePositionsStore`, `useFundingRatesStore`.
-- APIs/services:
-  - `fetchCurrentPrice`, `subscribeToPrice`, `subscribeToOrderBook`, `fetch24hTicker`.
-  - `getMarketMetrics`, `subscribeToHyperliquidOrderBook`, `fetchPerpDexs`.
-  - `fetchAllDexsRWAData`, `fetchSingleDexRWAData`.
-  - `createTrade` backend persistence.
-
-Critical input rules currently implemented:
-- Exchange support constrained to `Hyperliquid` (`SUPPORTED_EXCHANGE`).
-- BTC and USDC inputs are mutually locking:
-  - If USDC has value -> BTC input disabled.
-  - If BTC has value -> USDC input disabled.
-- Numeric sanitization via `sanitizeNumberInput`.
-- Leverage slider range supports 1–50 and is displayed as `x` multiplier.
-
-Important UI control -> handler -> impact map:
-- Asset dropdown tabs (`Crypto`/`RWAs`) -> `setAssetType`.
-- RWA sub-tabs and DEX filter buttons -> `setRwaCategory`, `setSelectedDex`.
-- Asset row selection -> `setSelectedAsset`.
-- Exchange dropdown and selection -> `setSelectedExchanges` (enforced to Hyperliquid).
-- Buy/Sell toggle -> `setOrderSide`.
-- Strategy selection -> `setSelectedStrategies`.
-- Quantity/USDC inputs -> `setBtcAmount` / `setUsdtAmount` with sanitization and locking.
-- Limit price mode/input -> `setLimitPriceMode` / `setLimitPrice`.
-- Leverage slider -> `setLeverage`.
-- IOC/Pause/Grid toggles -> `setIoc` / `setPause` / `setGrid`.
-- Duration/timezone/timestamps/trajectory -> local execution params.
-- Exit conditions and urgency controls -> local state only.
-- `Save Templates` -> opens modal then `handleSaveTemplate` persists to `localStorage['aggregatorTemplates']`.
-- `Load Templates` -> opens modal then `handleLoadTemplate(template)` restores full form state.
-- Template delete -> `handleDeleteTemplate(id)` updates local state + localStorage.
-
-Execution path (`Confirm and Execute` button):
-- Closes confirmation modal.
-- Creates open order object and pushes via `useAppStore.addOpenOrder`.
-- Creates order in global trades store via `addOrder(...)`.
-- Creates trade via `addTrade(...)`.
-- Computes leveraged volume notional:
-  - `volume = usdcNotional * leverage * (arbitrage ? 2 : 1)`.
-- Appends history via `addHistoryEntry(...)` with leverage and buy/sell metadata.
-- Best-effort backend persistence via `createTrade({ symbol, side, notionalUsd, leverage, entryPrice })`.
-- Creates position legs and pushes via `usePositionsStore.addPosition(...)` including entry funding rates.
-- Calls parent `onCreateOrder(orderRequest)` to register active order / navigation flow.
-
-Backend implications from this component:
-- Backend must support trade creation + portfolio aggregation consistent with:
-  - leverage-aware volume.
-  - position legs (long/short, exchange, entry price, entry funding).
-  - notional and margin derived metrics used by portfolio page.
-
-### `src/components/AggregatorPageOrders.tsx`
-Component(s): `OrdersSection`.
-
-Role:
-- Lower panel tabs (`Open Orders`, `Rebalancing`, `Funding History`, `Deposits/Withdrawals`).
-- Simulates order fill progression for pending/in-progress orders.
-
-Key logic:
-- `useEffect` scans `orders` and starts timers for unprocessed pending orders.
-- Calls `useTradesStore.updateOrderProgress(orderId, filled, status)` until `filled`.
-
-Impact:
-- Mutates `openOrders` visual progress/status in store.
-- Most non-open-orders tabs are static placeholder rows.
-
-### `src/components/AggregatorPageFetchHelper.tsx`
-Component(s): helper module (no React component export).
-
-Role:
-- RWA fetch helper for Aggregator + ExchangePairSelector.
-
-Functions:
-- `fetchAllDexsRWAData(...)`: parallel multi-DEX symbol/details fetch + merge by category.
-- `fetchSingleDexRWAData(...)`: single-DEX path.
-- 30s in-memory cache (`Map`) keyed by dex mode.
-
-Impact:
-- Reports `source` (`live`/`mock`) and error state back to caller.
-
-### `src/components/TradingChart.tsx`
-Component(s): `TradingChart`, internal `CandlestickChart`.
-
-Role:
-- Instrument chart widget for selected asset.
-
-Controls:
-- Timeframe buttons (`1m`..`1w`) -> `setTimeframe` and reload OHLC.
-- Chart type toggle (`line`/`candle`) -> `setChartType`.
-
-Data path:
-- `fetchKlineData(selectedAsset, timeframe, 100)`.
-- Live updates via `subscribeToPrice(...)`.
-- Line chart refresh interval: 30s.
-- Candlestick live update throttled to ~1s.
-
-Impact:
-- Visual analytics only (no backend write).
+**Login modal + wallet connect**
+- `CustomConnectButton` connect:
+- `useMockWallet.connect()`.
+- delayed auth set: `setUser({address})`, `setStatus('authenticated')`.
+- disconnect:
+- `useMockWallet.disconnect()`, `setUser(null)`, `setStatus('unauthenticated')`.
 
 ---
 
-## 7. Carry page (`/trade`)
+## 5. Explore Page (`/explore`) — Explicit Interaction Spec
 
-### `src/components/FundingRateArbPage.tsx`
-Component(s): `FundingRateArbPage`.
-Used shared: `ExchangePairSelector`, `MultiOrderConfirmation`, `OrdersSection`, `FundingRateArbChart`.
+Primary component: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/ExplorePage.tsx`
 
-Role:
-- Funding rate arbitrage builder with long/short legs.
+### 5.1 Data and polling
+- On mount: `fetchLiveFundingRates()` from `useFundingRatesStore`.
+- Poll every 60s via `setInterval`.
+- Watchlist price/volume/24h change read from `useMarketDataStore.assets`.
 
-Current exchange policy:
-- Constrained to Hyperliquid (`SUPPORTED_EXCHANGES = ['Hyperliquid']`).
+### 5.2 Controls and effects
 
-Key controls and impacts:
-- Buy/Sell exchange buttons -> selector modal open.
-- Buy/Sell pair buttons -> selector modal open.
-- Quantity/leverage text inputs for both legs.
-- Mode tabs (`advanced`/`automated`) and strategy sliders/toggles.
-- `Execute` button -> opens `MultiOrderConfirmation`.
-- `Deposit`/`Withdraw`/`Transfer` buttons -> open global modals.
+| UI Control | Handler / State | Calls | Impact |
+|---|---|---|---|
+| Watchlist sort `Volume` | `setSortBy('volume')` | none | sort mode updates local UI order |
+| Watchlist sort `Price` | `setSortBy('price')` | none | sort mode updates local UI order |
+| Watchlist search input | `setWatchlistSearch` | none | filters search dropdown |
+| Search result row click | inline callback | `toggleFavorite(token)` | adds token to favorites; clears search |
+| Favorite row click | `handleFavoriteClick(token)` | none | toggles selected favorite filter |
+| Favorite star click | `toggleFavorite(token)` | none | add/remove from favorites |
+| Main matrix search | `setSearchQuery` | none | filters funding matrix rows |
+| Capacity weighted input | numeric parse + `setCapacityWeightedValue` | none | affects displayed rates via attenuation function |
+| Timeframe tabs Day/Week/Month/Year | `setTimeframe(tab)` | none | display conversion (`daily`, `*7`, `*30`, `*365`) |
+| Funding matrix cell click | `handleCellClick(token, exchange, rate)` | `onTradeSelect(buy,sell)` when 2 valid cells selected | selects up to 2 cells; second selection triggers Carry navigation flow |
 
-Execution path (`MultiOrderConfirmation.onConfirm`):
-- Closes modal.
-- Computes buy/sell token, sizes, leverage, live prices from prices store.
-- Adds leverage-adjusted volume with `useAppStore.getState().addVolume(totalVolume)`.
-- Adds carry order via `useTradesStore.addOrder({ type:'carry', carryTrade: ... })`.
-- Adds long and short legs via `addTrade(..., skipAutoHistory=true)`.
-- Adds single consolidated history entry via `addHistoryEntry(...)` (side `Multi`).
-- Creates 2-leg arbitrage position in `usePositionsStore.addPosition(...)` with funding rates.
-- Navigates to `/portfolio?tab=history&trade=multi&detailTab=execution`.
-
-Backend implications:
-- Position model must support multi-leg long/short pair representation.
-- Volume and PnL on portfolio must include both legs.
-
-### `src/components/FundingRateArbChart.tsx`
-Component(s): `FundingRateArbChart`.
-
-Role:
-- Live spread/earnings projection chart for configured carry trade.
-
-Data path:
-- Funding rates from `useFundingRatesStore.getRate(...)`.
-- HIP-3 pair handling:
-  - Detects HIP-3 pair prefixes.
-  - Fetches live funding via `getMarketMetrics(pair, dex)`.
-
-Computed outputs:
-- Buy/sell funding, spread, annual and period earnings.
-- Timeframe projections (`Day`, `Week`, `Month`, `Year`).
-
-Impact:
-- Read-only analytics.
-
-### `src/components/MultiOrderConfirmation/MultiOrderConfirmation.tsx`
-Component(s): `MultiOrderConfirmation`.
-
-Role:
-- Confirmation modal for carry multi-leg order submission.
-
-Controls:
-- `Cancel` -> `onClose()`.
-- `Submit Multi Order` -> `onConfirm()`.
-
-Impact:
-- Delegated; actual state/API changes happen in parent `FundingRateArbPage`.
+### 5.3 Cross-component interaction (Explore -> Carry)
+1. User selects two valid funding cells.
+2. `ExplorePage` computes arbitrage ordering (lower funding = buy, higher = sell).
+3. Calls `onTradeSelect(buyCell, sellCell)` (prop from `AppRouter`/`App`).
+4. `useTradeSelection.handleTradeSelect` stores `preselectedTrade` in app store.
+5. `useNavigation.navigateTo('funding-arb')` routes to `/trade`.
 
 ---
 
-## 8. Market Maker page (`/market-maker`)
+## 6. Aggregator Page (`/aggregator`) — Explicit Interaction Spec
 
-### `src/components/MarketMakerPage/MarketMakerPage.tsx` (active runtime version)
-Component(s): `MarketMakerPage`.
-Used shared: `ExchangePairSelector`, `Tooltip`.
+Primary component: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/AggregatorPage.tsx`
 
-Role:
-- Multi-mode market-maker UI with `advanced`, `automated`, `multiOrder`, `exchangePoints`, `enterprise` tabs.
+### 6.1 Input constraints and defaults
+- Execution venue enforced to Hyperliquid (`SUPPORTED_EXCHANGE='Hyperliquid'`).
+- Base/quote placeholders from selected asset:
+- base token = selected symbol (`BTC`, `ETH`, etc).
+- quote token constant `'USD'` (display) while confirmation shows `USDC` amount string variable.
+- Mutual lock:
+- `isBtcAmountLocked = usdtAmount.trim().length > 0`
+- `isUsdtAmountLocked = btcAmount.trim().length > 0`
+- Numeric sanitization for both fields via `sanitizeNumberInput`.
+- Leverage slider range `1..50`.
 
-Top tab controls:
-- `setActiveTab('advanced'|'automated'|'multiOrder'|'exchangePoints'|'enterprise')`.
+### 6.2 Main form controls
 
-#### Advanced tab
-Main controls:
-- Exchange/pair selector buttons -> open `ExchangePairSelector`.
-- Margin/leverage/spread/order params/refresh/inventory/risk fields -> local state.
-- Participation rate chips (`passive/neutral/aggressive`).
-- Auto-repeat and tolerance switches.
-- `Start Market Making` button:
-  - Builds `ActiveMarketMakerStrategy` object.
-  - Calls `useAppStore.deployMarketMakerStrategies([strategy])`.
-  - Calls `useTradesStore.addOrder(...)` and `addTrade(...)`.
-  - Navigates to strategy monitor via `onNavigateToStrategy(strategyId)`.
+| UI Control | Handler / State | Calls | Impact |
+|---|---|---|---|
+| Asset dropdown open/close | `setAssetDropdownOpen` | none | opens asset menu |
+| Asset type tabs `Crypto`/`RWAs` | `setAssetType` | none | changes asset list source |
+| RWA category tabs | `setRwaCategory` | none | filters RWA assets |
+| RWA DEX filter chips | `setSelectedDex` | none | filters RWA assets by DEX |
+| Asset row click | `setSelectedAsset` | market fetch effects | updates selected instrument and dependent data |
+| Exchange dropdown toggle | `setExchangesDropdownOpen` | none | opens exchange menu |
+| Exchange checkbox row | `toggleExchange(exchange)` | none | keeps Hyperliquid only (ignores unsupported exchange) |
+| Side buttons `Buy` / `Sell` | `setOrderSide` | none | side changes confirmation and order payload |
+| Base amount input | `setBtcAmount(sanitizeNumberInput(...))` | none | numeric-only value; can disable quote input |
+| Quote amount input | `setUsdtAmount(sanitizeNumberInput(...))` | none | numeric-only value; can disable base input |
+| Upper slider under amount fields | `<input type='range'>` no state binding | none | UI-only currently |
+| Leverage slider | `setLeverage(parseInt(...))` | none | updates leverage and downstream notional/volume |
+| Strategy dropdown | `toggleStrategy(strategy)` | none | multi-select strategies in local state |
+| Limit price text | `setLimitPrice` | none | manual limit value |
+| Limit price mode toggle | `setLimitPriceMode('Dynamic'/'Manual')` | none | toggles manual input disabled state |
+| IOC/Pause/Grid | `setIoc/setPause/setGrid` | none | flag values added to order payload |
+| Duration input | `setDuration` | none | execution param |
+| Timezone select | `setTimezone` | none | execution param |
+| Time Start / End inputs | `setTimeStart/setTimeEnd` | none | execution param |
+| Exit Conditions accordion | `setExitConditionsOpen` | none | shows take-profit/stop-loss controls |
+| TP/SL urgency buttons | `setTakeProfitUrgency` / `setStopLossUrgency` | none | urgency metadata |
+| Scale Orders accordion | `setScaleOrdersOpen` | none | exposes mostly UI-only parameter controls |
+| `%/$` price unit buttons | `setPriceUnit('%'|'$')` | none | local display mode |
+| Advanced Settings accordion | `setAdvancedSettingsOpen` | none | reveals additional settings |
+| Trajectory select | `setTrajectory` | none | included in order payload |
+| Save Templates | `setShowSaveTemplateModal(true)` | none | opens save modal |
+| Load Templates | `setShowLoadTemplateModal(true)` | none | opens load modal |
+| Bottom `Submit Buy Order` | no handler | none | UI-only |
+| Bottom `Confirmation` | `setShowConfirmationModal(true)` | none | opens order confirmation modal |
 
-#### Automated tab (vault workflows)
-Controls:
-- Vault card click -> `setSelectedVault(id)`.
-- Deploy capital / leverage / slippage / drawdown inputs.
-- Vault management actions:
-  - `handleVaultDeposit()` updates creator deposit state.
-  - `handleVaultWithdraw()` applies min 5% TVL condition then updates state.
-  - `handleTakeProfit()` reduces accumulated profits.
-- Vault creation modal flow:
-  - Steps: `name -> deposit -> confirm -> success`.
-  - `handleCreateVault()` simulates async create then success state.
+### 6.3 Template modal controls
 
-Impact:
-- Current implementation is local/mock state only (no backend writes).
+| Control | Calls | Impact |
+|---|---|---|
+| Save modal name input | local `setTemplateName` | staged template name |
+| Save modal `Cancel` | close + clear name | modal close |
+| Save modal `Save` | `handleSaveTemplate` | writes template to state + `localStorage['aggregatorTemplates']` |
+| Load modal `Load` per row | `handleLoadTemplate(template)` | restores full form state |
+| Load modal delete icon | `handleDeleteTemplate(id)` | removes template from state + localStorage |
 
-#### Multi-Order tab
-Controls:
-- Strategy card expansion, remove, upload JSON.
-- Validation submit per strategy (`validateAndSubmitStrategy(strategyId)`).
-- `Run Simulation` -> `runSimulation()` computes mock portfolio metrics and opens modal.
-- `Deploy All Strategies` -> opens confirmation modal.
-- Confirmation `Confirm & Deploy` -> `confirmDeployAllStrategies()`:
-  - Converts valid strategies to `ActiveMarketMakerStrategy[]`.
-  - Calls `deployMarketMakerStrategies(activeStrategies)`.
-  - For each strategy calls `addOrder(...)` and `addTrade(...)`.
-  - Navigates to first deployed strategy monitor.
+### 6.4 Confirmation modal controls and execution chain
 
-#### Exchange Points tab
-- Displays point status cards from static `EXCHANGE_POINTS`.
-- No backend calls; informational UI.
+| Control | Calls | Impact |
+|---|---|---|
+| `Cancel` | close modal | no order created |
+| `Confirm and Execute` | see chain below | creates order/trade/history/position + navigates to portfolio history detail |
 
-#### Enterprise tab
-Controls:
-- Enterprise auth input + submit (`handleEnterpriseSubmit`) accepts code `1234`.
-- Feature selection cards (`analytics`, `support`, `strategies`, `api`).
-- API key generation (`generateApiKey()`).
-- Strategy JSON upload (`handleStrategyFileUpload`, drag/drop handlers).
-- Deploy/clear buttons for uploaded strategy (`handleDeployStrategy`, `handleClearStrategy`).
+**Execution chain (`Confirm and Execute`)**
+1. Closes confirmation modal.
+2. Creates open-order row in app store via `addOpenOrder`.
+3. Creates trade store order via `addOrder(...)`.
+4. Creates trade store position via `addTrade(..., skipAutoHistory=true)`.
+5. Computes `amount`, `price`, `usdcNotional`.
+6. Computes `volumeNotional = usdcNotional * leverage * (isArbitrage ? 2 : 1)`.
+7. Writes consolidated history entry via `addHistoryEntry(...)`.
+8. Best-effort backend persistence: `createTrade({symbol, side, notionalUsd, leverage, entryPrice})`.
+9. Creates `positionsStore` position with 1 leg (single) or 2 legs (arbitrage).
+10. Calls parent `onCreateOrder(orderRequest)`.
+11. Parent hook `useOrderManagement.handleCreateOrder` attempts backend `createOrderApi`, then always routes to:
+- `/portfolio?tab=history&filter=Single&detailTab=execution`.
 
-Impact:
-- Mostly UI/mock state + console logs.
-- No actual enterprise backend integration in current runtime implementation.
+### 6.5 Subcomponents in Aggregator page
 
-### Refactor files present but not primary runtime
+**Orders panel** (`/src/components/AggregatorPageOrders.tsx`)
+- Tabs:
+- `Open Orders`, `Rebalancing`, `Funding History`, `Deposits/Withdrawals`.
+- `Open Orders` tab:
+- Simulates fill progression for pending orders by timers.
+- calls `updateOrderProgress(orderId, filled, status)` until filled.
+- Most non-open tabs are static table rows.
 
-`src/components/MarketMakerPage/MarketMakerPageRefactored.tsx`
-- Alternative form-driven architecture using `react-hook-form` + zod schemas.
-- References tab components (`AutomatedTab`, `EnterpriseTab`) not present in current tree.
-- Not wired through router; `MarketMakerPage.tsx` is active page component.
-
-`src/components/MarketMakerPage/AdvancedTab.tsx`
-- Truncated/incomplete file; currently not production-ready.
-
-`src/components/MarketMakerPage/MultiOrderTab.tsx`
-- Form-driven multi-strategy tab component for refactor architecture.
-
-`src/components/MarketMakerPage/ExchangePointsTab.tsx`
-- Refactor tab component for points display.
-
-`src/components/MarketMakerPage/StrategyCard.tsx`
-- Refactor multi-strategy card with computed estimates.
-
-`src/components/MarketMakerPage/StrategySummary.tsx`
-- Refactor summary block with reactive estimate computations.
-
-`src/components/MarketMakerPage/FormField.tsx`
-- Shared form input component with tooltip + RHF support.
-
-`src/components/MarketMakerPage/types.ts`
-- Zod schemas and typed form models for refactor path.
-
----
-
-## 9. Portfolio page (`/portfolio`)
-
-### `src/components/PortfolioPage/PortfolioPage.tsx`
-Component(s): `PortfolioPage`.
-Used shared: `PortfolioOverview`, `PortfolioExchanges`, `TradeHistory`, `StrategyMonitorPage`.
-
-Role:
-- Portfolio shell with top stats cards and tabbed sub-views.
-
-Core data dependencies:
-- `useAppStore`: exchange allocations, MM strategies, disconnect.
-- `useTradesStore`: history + clear.
-- `usePositionsStore`: clear positions.
-- `useLivePositions`: live PnL and open position legs.
-- Backend APIs: `getPortfolioSummary`, `resetPortfolio`.
-
-Main controls and impacts:
-- Top action buttons:
-  - `Deposit` -> open modal.
-  - `Withdraw` -> open modal.
-  - `Transfer` -> open modal.
-  - `Reset Account` -> confirmation then:
-    - best-effort `resetPortfolio()` API.
-    - `clearAllTrades()`.
-    - `clearPositions()`.
-    - `disconnectWallet()`.
-    - `clearSession()`.
-    - reset UI tab/summary.
-- Tab buttons (`overview`, `exchanges`, `history`, `marketMaker`) -> `setActiveTab`.
-- Strategy row click in market maker tab -> opens `StrategyMonitorPage`.
-
-URL behavior:
-- Reads `tab`, `detailTab`, and `trade` query params and initializes corresponding state.
-- Reads `initialStrategyId` and auto-opens strategy monitor.
-
-### `src/components/PortfolioOverview.tsx`
-Component(s): `PortfolioOverview`.
-
-Role:
-- Main equity, volume, distribution, and balances/positions table panel.
-
-Computed metrics (`useMemo`):
-- `unlockedVaultEquity` from deposit.
-- `exchangeEquity` from allocations.
-- `lockedMarginEquity` from open positions + active MM strategy margin.
-- `unlockedMarginEquity` = exchange - locked.
-- `totalEquity` = base equity + combined PnL (fallback to backend summary if needed).
-- `totalVolume` from history entries (`entry.volume`) with fallback.
-
-Controls:
-- Volume timeframe selector (display-only currently).
-- PNL timeframe selector (display-only currently).
-- Lower table tab buttons (`Balances`, `Positions`, `Trade History`, `Funding History`, `Rebalancing`, `Deposits & Withdrawals`).
-
-Impact:
-- Mostly computed display.
-- No direct backend writes.
-
-### `src/components/PortfolioExchanges/PortfolioExchanges.tsx`
-Component(s): `PortfolioExchanges`.
-
-Role:
-- Exchange-level portfolio analytics panel with left exchange list and right chart cards.
-
-Controls:
-- Exchange selection buttons (`setSelectedExchange`).
-- Analytics tabs (`portfolio`, `funding`).
-- Time period tabs (`1d`, `7d`, `30d`, `1y`).
-- `Configure Accounts` button calls parent callback.
-
-Impact:
-- Presently mock/data-visual UI, no backend mutation.
-
-### `src/components/TradeHistory.tsx`
-Component(s): `TradeHistory`.
-
-Role:
-- Trade list and filter/pagination; opens `TradeDetailView`.
-
-Data source merge strategy:
-- Backend orders (`GET /api/v1/orders`) polled every 15s.
-- `useTradesStore.history` converted to display trades.
-- `useAppStore.tradeHistory` legacy entries.
-- Static mock trades.
-
-Controls and impacts:
-- Filter tabs (`Active`, `Canceled`, `Finished`, ... `Multi`) -> `setActiveFilter`.
-- Row click -> `setSelectedTrade(trade)` and open detail page.
-- Pagination arrows -> `setCurrentPage`.
-
-Deep-link behavior:
-- `initialTradeType='multi'` auto-selects latest real multi trade from global history when ready.
-
-### `src/components/TradeDetailView.tsx`
-Component(s): `TradeDetailView`.
-Internal subcomponents: `StatusTab`, `ExecutionTab`, `RebalancingTab`.
-
-Role:
-- Detailed execution page for a selected trade.
-
-Controls:
-- Back/close -> `onBack()`.
-- Tab switch (`status`, `execution`, `rebalancing`) -> `setActiveTab`.
-
-`StatusTab` behavior:
-- Uses `usePricesStore.getPrice` for live mark prices.
-- Recomputes buy/sell leg unrealized PnL and PnL %.
-- Displays leg tables and charts.
-
-`ExecutionTab` behavior:
-- Shows execution rows and metrics cards.
-- For `Single` side uses `ExchangeExecutionChart` with selected/trade exchanges.
-- For `Multi` side shows custom net-exposure SVG.
-
-`RebalancingTab` behavior:
-- Static dashboard cards for threshold and rebalance data.
-
-Impact:
-- Read-only visualization of prior execution and live pricing.
-
-### `src/components/ExchangeExecutionChart.tsx`
-Component(s): `ExchangeExecutionChart`.
-
-Role:
-- Synthetic line chart for exchange execution percentage over time.
-
-Notes:
-- Uses randomized dataset generation in `useMemo`.
-- Regenerates when exchange set changes.
-
-### `src/components/StrategyMonitorPage/StrategyMonitorPage.tsx`
-Component(s): `StrategyMonitorPage`.
-Used shared: `SimpleLineChart`, `SimpleAreaChart`, `SimpleComposedChart`.
-
-Role:
-- Detailed strategy analytics view (multi-strategy + single position drill-down).
-
-Controls:
-- `Back to Portfolio` or `Back to Multi-Strategy` based on drill-down state.
-- Time range buttons (`1h`, `4h`, `24h`, `7d`).
-- Position row click toggles position-specific analytics.
-
-Data:
-- Generated synthetic time series and derived metrics (PnL, volume, spread, fill rates, exposure).
-
-Impact:
-- Analytics UI; no backend writes.
-
-### Simple chart components
-
-`src/components/SimpleLineChart.tsx`
-- Generic SVG line chart with optional gradient fill and custom formatter.
-
-`src/components/SimpleAreaChart.tsx`
-- Generic SVG area/line chart.
-
-`src/components/SimpleComposedChart.tsx`
-- Generic composed chart supporting line/area/bar overlays.
-
-Impact for all three:
-- Pure presentation components, no store/API writes.
+**Trading chart** (`/src/components/TradingChart.tsx`)
+- Timeframe buttons and chart type toggle.
+- Fetches OHLC via `fetchKlineData(...)`.
+- Live update via `subscribeToPrice(...)`.
+- Line chart refresh interval 30s; candlestick last-point update throttled to ~1s.
 
 ---
 
-## 10. More and blockchain explorer pages
+## 7. Carry Page (`/trade`) — Explicit Interaction Spec
 
-### `src/components/MorePage/MorePage.tsx`
-Component(s): `MorePage`.
+Primary component: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/FundingRateArbPage.tsx`
 
-Role:
-- Additional cards for documentation/support/settings placeholders.
+### 7.1 Constraints and prefill
+- Exchanges constrained to Hyperliquid: `SUPPORTED_EXCHANGES=['Hyperliquid']`.
+- Prefill from Explore path (`preselectedTrade`) sets buy/sell exchanges to `hyperliquid` and pairs to provided token strings.
 
-Controls:
-- `Documentation` card is external link to GitBook.
-- Other cards currently static placeholders.
+### 7.2 Controls and effects
 
-### `src/components/BlockchainExplorerPage/BlockchainExplorerPage.tsx`
-Component(s): `BlockchainExplorerPage`.
+| UI Control | Handler / State | Calls | Impact |
+|---|---|---|---|
+| Time range tabs `Day/Week/Month/Year` (chart header) | `setTimeRange` | none | changes projection period in chart |
+| Buy exchange button | `setShowBuyExchangeSelector(true)` | opens `ExchangePairSelector` | selecting sets `selectedBuyAccount` |
+| Buy pair button | `setShowBuyPairSelector(true)` | selector callback | sets `selectedBuyPair` |
+| Buy quantity input | `setBuyQuantity` | none | notional input |
+| Buy leverage input | strips non-digits, caps at 50 | none | leverage input with `x` display |
+| Buy side mini buttons (`⇄`, `✖`) | no bound handlers | none | UI-only |
+| Sell exchange button | `setShowSellExchangeSelector(true)` | selector callback | sets `selectedSellAccount` |
+| Sell pair button | `setShowSellPairSelector(true)` | selector callback | sets `selectedSellPair` |
+| Sell quantity input | `setSellQuantity` | none | notional input |
+| Sell leverage input | strips non-digits, caps at 50 | none | leverage input |
+| Sell side mini buttons (`⇄`, `✖`) | no bound handlers | none | UI-only |
+| Mode tabs `Advanced`/`Automated` | `setTradeMode` | none | disables/enables parameter sections |
+| Duration input | `setDuration` | none | execution metadata |
+| Timeframe select | `setTimeframe` | none | execution metadata |
+| Strategy sliders (exposure/passiveness/discretion/alphaTilt/directionalBias) | `set...` | none | used in confirmation display |
+| Clip size input | `setClipSize` | none | used in confirmation display |
+| Strategy checkboxes | `setActiveStrategies({...})` | none | used in confirmation display |
+| `Submit Multi Order` | `setShowConfirmation(true)` | none | opens `MultiOrderConfirmation` |
+| `Reset Default` | no handler | none | UI-only |
+| Account buttons `Deposit/Withdraw/Transfer` | `onOpenDeposit/onOpenWithdraw/onOpenTransfer` | parent modal handlers | opens corresponding global modal |
 
-Role:
-- Mock live transaction explorer feed.
+### 7.3 Multi-order confirmation modal (`MultiOrderConfirmation`)
 
-Behavior:
-- Injects random new transactions every ~2-5 seconds.
-- Tracks and highlights fresh rows.
+| Control | Calls | Impact |
+|---|---|---|
+| `Cancel` | `onClose` | closes modal |
+| `Submit Multi Order` | `onConfirm` | executes carry flow below |
 
-Controls:
-- Search input -> `setSearchQuery`.
-- Status filter buttons (`all/success/pending/failed`) -> `setFilterStatus`.
-- Rows-per-page select -> `setRowsPerPage` + reset page.
-- Pagination arrows -> `handlePageChange`.
-- External link icon -> opens transaction URL on explorer domain.
+**Carry execution chain (`onConfirm`)**
+1. Close modal.
+2. Parse token/qty/leverage from inputs.
+3. Read live prices from `usePricesStore.getPrice`.
+4. Compute `totalVolume = buyQty*buyLev + sellQty*sellLev`.
+5. `useAppStore.getState().addVolume(totalVolume)`.
+6. Add combined carry order (`addOrder` with `type:'carry'`).
+7. Add long trade and short trade (`addTrade(..., true)` for both).
+8. Add one combined history entry via `addHistoryEntry` including:
+- buy/sell quantities and leverages
+- buy/sell exchanges
+- buy/sell pairs
+- buy/sell prices
+- duration
+9. Add 2-leg arbitrage position via `positionsStore.addPosition`.
+10. Navigate to `/portfolio?tab=history&trade=multi&detailTab=execution` by pushState + `navigation` event.
 
-Impact:
-- No backend writes; simulated data source.
+### 7.4 Funding arbitrage chart (`FundingRateArbChart`)
+- Uses store rates and optional HIP-3 live metrics from `getMarketMetrics`.
+- Computes:
+- `buyNotional = buyQty * buyLev`
+- `sellNotional = sellQty * sellLev`
+- `positionNotional = max(buyNotional, sellNotional)`
+- `currentRateDiff = sellFundingRate - buyFundingRate`
+- `annualDollarReturn = positionNotional * (currentRateDiff / 100)`
+- `dailyDollarReturn = annualDollarReturn / 365`
+- Projection PnL points are linear over elapsed days for selected range.
+
+---
+
+## 8. Market Maker Page (`/market-maker`) — Explicit Interaction Spec
+
+Primary runtime component: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/MarketMakerPage/MarketMakerPage.tsx`
+
+### 8.1 Global tab controls
+| Tab button | Handler | Impact |
+|---|---|---|
+| `Advanced` | `setActiveTab('advanced')` | show advanced market making form |
+| `Automated` | `setActiveTab('automated')` | show vault UI |
+| `Multi-Order` | `setActiveTab('multiOrder')` | show multi-strategy builder |
+| `Exchange Points` | `setActiveTab('exchangePoints')` | show points cards |
+| `Enterprise` | `setActiveTab('enterprise')` | show enterprise/auth/API UI |
+
+### 8.2 Advanced tab controls
+
+| UI Control | Handler / State | Calls | Impact |
+|---|---|---|---|
+| Exchange selector button | `setShowExchangePairSelector(true)` | selector callback | sets `selectedExchange` |
+| Pair selector button | `setShowExchangePairSelector(true)` | selector callback | sets `selectedPair` |
+| Margin/leverage/spread/order params inputs | `set...` | none | local strategy params |
+| Participation buttons (`passive/neutral/aggressive`) | `setParticipationRate` | none | changes runtime estimate assumptions |
+| Auto-repeat toggle and config | `setEnableAutoRepeat`, etc | none | modifies estimate + strategy payload |
+| PnL tolerance toggle and value | `setEnablePnlTolerance`, `setTolerancePercent` | none | modifies strategy payload |
+| `Start Market Making` | inline onClick | `deployMarketMakerStrategies`, `addOrder`, `addTrade`, `onNavigateToStrategy` | creates active strategy + trade/order entries then navigates strategy monitor |
+
+**Start button preconditions**
+- Disabled unless `selectedExchange && selectedPair && margin`.
+
+**Advanced estimated performance calculations (`calculateStrategyEstimates`)**
+- `volumePerRun = margin * leverage * 20`
+- `timePerRunMinutes`: aggressive 5, neutral 15, passive 45
+- `maxPossibleRunsPerDay = floor(24*60 / timePerRunMinutes)`
+- `actualRunsPerDay = enableAutoRepeat ? min(maxPossibleRunsPerDay, maxRuns) : 1`
+- `dailyVolume = volumePerRun * actualRunsPerDay`
+- `makerFees = dailyVolume * abs(-0.0001)`
+- `spreadCaptureRate = (spreadBps/10000)/2`
+- `spreadProfit = dailyVolume * spreadCaptureRate`
+- `dailyReturn = spreadProfit + makerFees`
+- `dailyReturnPercent = dailyReturn / margin * 100`
+- `monthlyReturn = dailyReturn * 30`
+
+### 8.3 Automated tab controls (vault workflow)
+
+| UI Control | Handler | Impact |
+|---|---|---|
+| Vault card select | `setSelectedVault(vault.id)` | selects vault context |
+| Deploy capital, leverage, slippage, max drawdown inputs | `set...` | local config only |
+| `Deploy to Vault` | inline button (current logic is local/mock) | no backend order flow |
+| Vault management deposit | `handleVaultDeposit` | updates local vault management state |
+| Vault management withdraw | `handleVaultWithdraw` | local update with min-liquidity guard |
+| Take profit from vault | `handleTakeProfit` | local update |
+| `Create New Vault` | opens creation modal (`setShowVaultCreationModal`) | starts wizard |
+| Creation wizard `Next/Back/Create` | `setVaultCreationStep`, `handleCreateVault` | local simulated async create |
+
+### 8.4 Multi-Order tab controls
+
+| UI Control | Handler | Impact |
+|---|---|---|
+| Add strategy | append strategy object | new card in list |
+| Remove strategy | remove from array | deletes card |
+| Expand/collapse strategy card | `toggleStrategyExpansion` | show/hide form details |
+| Upload JSON per strategy | upload modal + `processStrategyJsonFile` | maps JSON fields into strategy form |
+| `Submit Strategy` | `validateAndSubmitStrategy(id)` | validates required fields then marks card submitted |
+| `Run a Simulation` | `runSimulation()` | computes and opens simulation results modal |
+| `Deploy All Strategies` | `setShowDeployConfirmation(true)` | opens confirmation |
+| `Confirm & Deploy` | `confirmDeployAllStrategies` | deploys all valid strategies to app store, adds order/trades, navigates to first strategy monitor |
+
+### 8.5 Exchange Points tab
+- Renders static `EXCHANGE_POINTS` dataset.
+- No execution/API mutation.
+
+### 8.6 Enterprise tab controls
+
+| UI Control | Handler | Impact |
+|---|---|---|
+| Enterprise code input + `Submit` | `handleEnterpriseSubmit` | authenticates only for code `1234` |
+| Feature cards (`analytics/support/strategies/api`) | `setSelectedEnterpriseFeature` | toggles feature subview |
+| API key generate/regenerate | `generateApiKey` | local random key state |
+| JSON strategy upload | `handleStrategyFileUpload` | parses and validates file locally |
+| `Deploy Strategy` | `handleDeployStrategy` | marks deployed locally (no real backend deploy) |
+| `Clear` | `handleClearStrategy` | clears uploaded data |
 
 ---
 
-## 11. Shared/support components
+## 9. Portfolio Page (`/portfolio`) — Explicit Interaction Spec
 
-### `src/components/ExchangePairSelector/ExchangePairSelector.tsx`
-Component(s): `ExchangePairSelector`.
+Primary component: `/Users/justin/Documents/New Projects AI/funding-rate-arbitrage-mvp/src/components/PortfolioPage/PortfolioPage.tsx`
 
-Role:
-- Unified modal for selecting exchanges or trading pairs across pages.
+### 9.1 Top-level controls
 
-Data sources:
-- `useMarketDataStore` exchanges/assets.
-- RWA load via `fetchAllDexsRWAData(...)` when RWAs tab selected.
+| UI Control | Handler | Calls | Impact |
+|---|---|---|---|
+| `Deposit` | `onOpenDeposit` | parent modal hook | opens deposit modal |
+| `Withdraw` | `onOpenWithdraw` | parent modal hook | opens withdraw modal |
+| `Transfer` | `onOpenTransfer` | parent modal hook | opens transfer modal |
+| `Reset Account` | `handleResetAccount` | `resetPortfolio` (best effort), `clearAllTrades`, `clearPositions`, `disconnectWallet`, `clearSession` | clears local trading/account state and session; returns to overview |
+| Tab `Overview` | `setActiveTab('overview')` | none | renders `PortfolioOverview` |
+| Tab `Exchanges` | `setActiveTab('exchanges')` | none | renders `PortfolioExchanges` |
+| Tab `History` | `setActiveTab('history')` | none | renders `TradeHistory` |
+| Tab `Market Maker` | `setActiveTab('marketMaker')` | none | renders MM summary list and strategy cards |
+| Strategy name click in MM tab | `setSelectedStrategy({id,name})` | none | opens `StrategyMonitorPage` |
 
-Controls and impacts:
-- Search input + category tabs (`all`, `favorites`, `spot`, `perps`, `rwas`).
-- Exchange/DEX filter chips.
-- Favorite star toggle.
-- Pair row click:
-  - `mode='exchange'` -> select exchange+pair (`onSelect(exchange, pair)`).
-  - `mode='pair'` -> select pair for current exchange.
-  - RWA selection enforces Hyperliquid.
+### 9.2 Portfolio metrics formulas (top cards)
+- `exchangeEquity = sum(exchangeAllocations)`
+- `realizedPnl = sum(history trade entries with pnl)`
+- `liveLockedMargin = sum(leg.quantity*leg.entryPrice/leg.leverage)` over live open legs
+- `baseEquity = depositAmount + exchangeEquity`
+- `effectiveBaseEquity = baseEquity > 0 ? baseEquity : liveLockedMargin`
+- `totalEquity = effectiveBaseEquity + realizedPnl + unrealizedPnl`
+- `directionalBiasPercent = (longExposure - shortExposure) / totalEquity * 100`
+- exposures in bias calc include leverage: `quantity * entryPrice * leverage`
 
-### `src/components/ExchangeLogos/ExchangeLogos.tsx`
-Component(s): `ExchangeLogo`.
+### 9.3 Portfolio Overview (`/src/components/PortfolioOverview.tsx`)
 
-Role:
-- Inline SVG logos for known exchanges with letter fallback.
+| UI Control | Handler | Impact |
+|---|---|---|
+| Volume period select | local select value only | display-only currently |
+| PNL period select | local select value only | display-only currently |
+| Lower table tabs (`Balances`,`Positions`,`Trade History`,`Funding History`,`Rebalancing`,`Deposits & Withdrawals`) | `setPositionsTab(...)` | switches table body |
 
-Impact:
-- Presentation only.
+**Overview metric formulas**
+- `unlockedVaultEquity = depositAmount`
+- `exchangeEquity = sum(exchangeAllocations)`
+- `positionsMargin = sum(openTrades size*entryPrice / leverage)` from `tradesStore.positions`
+- `marketMakerMargin = sum(activeMarketMakerStrategies.margin)`
+- `lockedMarginEquity = computedLockedMargin > 0 ? computedLockedMargin : backendSummary.lockedMargin`
+- `unlockedMarginEquity = max(0, exchangeEquity - lockedMarginEquity)`
+- `combinedPnL = oldPnL + livePnL`
+- `totalEquity = computedTotalEquity > 0 ? computedTotalEquity : fallback`
+- `totalVolume = computed trade history volume sum or backend fallback`
 
-### `src/components/Tooltip.tsx`
-Component(s): custom `Tooltip`.
+### 9.4 Portfolio Exchanges (`/src/components/PortfolioExchanges/PortfolioExchanges.tsx`)
 
-Role:
-- Lightweight hover tooltip used in Explore/Aggregator/MM components.
+| UI Control | Handler | Impact |
+|---|---|---|
+| Exchange list row | `setSelectedExchange(name)` | updates right-panel selected exchange |
+| Analytics tab (`Portfolio`/`Funding`) | `setAnalyticsTab` | switches visible analytics block |
+| Time range (`1d/7d/30d/1y`) | `setTimePeriod` | switches selected button styling; chart dataset remains static mock arrays |
+| `Configure Accounts` | `onConfigureAccounts` | opens onboarding exchange modal |
+| CSV buttons | no callback | UI-only |
+| Deposit/Withdraw/Transfer buttons in exchange header | no callback wired in this component | UI-only |
+| Toggle switches in side settings | uncontrolled checkbox inputs | visual toggle only |
 
-Behavior:
-- Local `isVisible` state on mouse enter/leave.
+### 9.5 Trade History (`/src/components/TradeHistory.tsx`)
 
-### `src/components/figma/ImageWithFallback.tsx`
-Component(s): `ImageWithFallback`.
+| UI Control | Handler | Impact |
+|---|---|---|
+| Filter tabs (`Active`,`Canceled`,`Finished`,`...`,`Multi`,`Batch`) | `setActiveFilter(filter)` | visual filter state (table still renders combined list) |
+| `Cancel All` | no callback | UI-only |
+| Trade row click | `setSelectedTrade(trade)` | opens `TradeDetailView` |
+| Pagination arrows | `setCurrentPage` | page index update |
 
-Role:
-- Image wrapper replacing broken image with embedded fallback SVG.
+**Trade source merge order**
+- backend `/api/v1/orders` mapped rows
+- `useTradesStore.history` rows
+- `useAppStore.tradeHistory` rows
+- `MOCK_TRADES`
 
-### Error boundaries and error displays
+### 9.6 Trade Detail View (`/src/components/TradeDetailView.tsx`)
 
-`src/components/ErrorBoundary.tsx`
-- Root crash boundary used in `main.tsx`; provides reload and stack details.
+| UI Control | Handler | Impact |
+|---|---|---|
+| Close `X` | `onBack()` | returns to history table |
+| Tabs `status/execution/rebalancing` | `setActiveTab` | changes detail pane |
+| Left footer `Pause`/`Cancel` | no callbacks | UI-only |
 
-`src/components/Common/ErrorBoundary.tsx`
-`src/components/Common/ErrorBoundary/ErrorBoundary.tsx`
-- Alternate reusable boundary variant (duplicate implementation in both paths).
+**Status tab key calculations**
+- `buyPnl = (currentBuyPrice - buyPrice) * buyQuantity`
+- `sellPnl (short leg) = (sellPrice - currentSellPrice) * sellQuantity`
+- `totalPnl = buyPnl + sellPnl`
+- `pnlPercent = totalPnl / (buyQuantity + sellQuantity) * 100`
+- PnL chart path is simulated interpolation with noise (`generatePnlPath`), not historical trade PnL data.
 
-`src/components/Common/ErrorMessage.tsx`
-- `ErrorMessage` and `ErrorAlert` with retry/dismiss variants.
+**Execution tab key calculations**
+- `Target Notional` (left column): `formatTargetNotional(leverage, quantity)` -> `${leverage}x $${quantity} USDC`
+- `Target Notional` (right column): `quantity * leverage`.
+- Single-side execution chart uses `ExchangeExecutionChart` synthetic data.
+- Multi-side exposure chart is static hardcoded SVG bars/lines.
 
-### Loading skeletons
+### 9.7 Strategy Monitor (`/src/components/StrategyMonitorPage/StrategyMonitorPage.tsx`)
 
-`src/components/Common/LoadingSkeleton.tsx`
-- Internal primitives: `SkeletonBox`, `SkeletonText`, `SkeletonCircle`.
-- Exported skeleton sets:
-  - `PortfolioSkeleton`
-  - `TableSkeleton`
-  - `StatsCardSkeleton`
-  - `ExchangeCardSkeleton`
-  - `FundingRateTableSkeleton`
-  - `CardSkeleton`
-  - `ListSkeleton`
-  - `Spinner`
-  - `PageSpinner`
+| UI Control | Handler | Impact |
+|---|---|---|
+| `Back to Portfolio` / `Back to Multi-Strategy` | `onBack` or `setSelectedPosition(null)` | return navigation within portfolio context |
+| Time range buttons (`1h`,`4h`,`24h`,`7d`) | `setTimeRange` | regenerates simulated timeseries |
+| Position row click | `setSelectedPosition(id)` | enters single-position drilldown mode |
 
-Impact:
-- Presentation-only loading placeholders.
+**Data source**
+- Generated locally by `generateTimeSeriesData()`.
+- No backend chart source in current implementation.
 
 ---
+
+## 10. More and Blockchain Explorer Pages
+
+### 10.1 More page (`/src/components/MorePage/MorePage.tsx`)
+
+| Control | Handler | Impact |
+|---|---|---|
+| Documentation card | external link anchor | opens GitBook |
+| Support/Settings/Analytics/API/Community cards | no handler | UI-only cards |
+
+### 10.2 Blockchain Explorer (`/src/components/BlockchainExplorerPage/BlockchainExplorerPage.tsx`)
+
+| UI Control | Handler | Impact |
+|---|---|---|
+| Search input | `setSearchQuery` | filters transaction table by hash/action/user |
+| Status buttons `All/Success/Pending/Failed` | `setFilterStatus` | filters table rows |
+| Tx external-link icon | `window.open(explorerUrl, '_blank')` | opens tx on explorer domain |
+| Rows-per-page select | `setRowsPerPage`, `setCurrentPage(1)` | changes pagination window |
+| Prev/Next arrows | `handlePageChange` | changes page number |
+
+**Live feed behavior**
+- Adds synthetic transaction every ~2-5s.
+- Marks new row as highlighted for 2s.
+
+---
+
+## 11. Graph and Metric Calculation Specification (Explicit)
+
+### 11.1 Graph registry
+
+| Graph / Visual | Component | Data source | Calculation / mapping |
+|---|---|---|---|
+| Funding matrix heat cells | `ExplorePage` | `useFundingRatesStore.getTokenRates` | Daily rate displayed per timeframe conversion (`day`,`*7`,`*30`,`*365`); optional capacity attenuation using exchange capacity/log ratio |
+| Watchlist volume/price | `ExplorePage` | `useMarketDataStore.assets` | `volume24h` converted to billions (`/1e9`), price/24h change from store |
+| Trading price chart (line/candle) | `TradingChart` | `fetchKlineData` + `subscribeToPrice` | OHLC and line series from service; live last point update only for candle mode |
+| Carry projection chart | `FundingRateArbChart` | store rates and optional HIP-3 live metrics | Position notional from qty*lev; funding spread drives projected cumulative PnL over selected range |
+| Portfolio top-card mini bars | `PortfolioPage` | hardcoded array | Static visual bars; no data binding |
+| Portfolio overview donut | `PortfolioOverview` | selected exchanges + allocations | pie segments from each exchange `% = amount / total * 100` |
+| Portfolio overview right PNL chart | `PortfolioOverview` | hardcoded polyline points | Static SVG path; unknown business derivation |
+| Portfolio exchanges top equity chart | `PortfolioExchanges` | `equityChartData` static | Recharts `LineChart` with fixed dataset |
+| Portfolio exchanges notional chart | `PortfolioExchanges` | `notionalExposureData` static | Recharts line chart, static values |
+| Portfolio exchanges unrealized chart | `PortfolioExchanges` | `unrealizedPnLData` static | Recharts line chart, static values |
+| Trade detail status PnL chart | `TradeDetailView` `StatusTab` | computed current PnL + simulated progression | Path generated from current totalPnl with sinusoidal noise over 30 points |
+| Trade detail single execution chart | `ExchangeExecutionChart` | random generator | per-exchange random curves normalized to ~100%, regenerated when exchanges array changes |
+| Trade detail multi execution chart | `TradeDetailView` `ExecutionTab` | hardcoded SVG bars/lines | static net exposure/tolerance rendering |
+| Trade detail price/spread charts | `TradeDetailView` `ExecutionTab` | hardcoded SVG paths | static demo visuals |
+| Strategy monitor line/area/composed charts | `StrategyMonitorPage` + `Simple*` components | synthetic timeseries from generator | simulated correlated fields (PnL, volume, spreads, imbalance, fill rate); no backend source |
+
+### 11.2 Generic chart components (`SimpleLineChart`, `SimpleAreaChart`, `SimpleComposedChart`)
+- These components are presentation engines.
+- They compute axis min/max and normalize supplied `data` points into SVG coordinates.
+- They do not fetch or mutate data.
+- Business interpretation of values is `unknown` to these components; interpretation is provided by parent component.
+
+### 11.3 Portfolio metric cards formulas
+
+| Metric | Formula in FE |
+|---|---|
+| Total Equity | computed equity fallback chain (local calculated first, backend summary fallback) |
+| PnL card | primarily realized/history based in `PortfolioPage`; fallback currently uses backend `unrealizedPnL` when local is zero |
+| Unrealized PnL | from `useLivePositions.totalPnl` fallback to backend summary |
+| Directional Bias | `(longExposure - shortExposure) / totalEquity * 100`, leverage-weighted exposures, backend fallback if available |
+| Volume (overview) | `sum(history entry.volume for trade entries)` with fallback |
+
+### 11.4 Calculations marked unknown by code constraints
+- Any chart panel that uses hardcoded arrays/SVG paths has no derivable market formula in FE (`unknown`).
+- Placeholder table metrics (`Slippage`, `Minimal Exposure`, many MM/portfolio subcards) are static labels/values (`unknown` backend formula).
+
+---
+
 
 ## 12. UI primitives (`src/components/ui/*`)
 
