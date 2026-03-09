@@ -312,21 +312,21 @@ export default function ExplorePage({
   const formatValue = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '-';
     
-    // Value is stored as daily rate percentage
-    // Convert based on selected timeframe
+    // Value in store is annualized APR (%)
+    // Convert APR into selected timeframe return
     let displayValue = value;
     switch (timeframe) {
       case 'Day':
-        displayValue = value; // Already daily
+        displayValue = value / 365;
         break;
       case 'Week':
-        displayValue = value * 7;
+        displayValue = value / 52;
         break;
       case 'Month':
-        displayValue = value * 30; // Using 30 days for simplicity
+        displayValue = value / 12;
         break;
       case 'Year':
-        displayValue = value * 365;
+        displayValue = value;
         break;
     }
     
@@ -342,26 +342,21 @@ export default function ExplorePage({
       return null;
     }
 
-    // The stored rate is daily rate (as a percentage, e.g., 0.012 for 0.012%)
-    // Reverse calculate to get the raw funding interval rates
-    // Daily → 8hr → 1hr
-    
-    const dailyRate = rate; // e.g., 0.012 for 0.012%
-    const eightHourRate = dailyRate / 3; // 8hr rate as % (3 periods per day)
-    const oneHourRate = eightHourRate / 8; // 1hr rate as %
-    const yearlyAPY = dailyRate * 365; // Annualized
-    
-    // The raw API value can be reverse calculated
-    // dailyRate = (apiValue / 10000) * 3 * 100
-    // So: apiValue = (dailyRate / 100) * 10000 / 3
-    const rawApiValue = (dailyRate / 100) * 10000 / 3;
+    // Store keeps annualized APR (%). Derive shorter intervals from APR.
+    const yearlyAPY = rate;
+    const dailyRate = yearlyAPY / 365;
+    const eightHourRate = dailyRate / 3;
+    const oneHourRate = eightHourRate / 8;
+
+    // Approximate 8h raw value in bps for display
+    const rawApiValue = eightHourRate * 100;
 
     return {
       interval: '8hr', // Most exchanges use 8hr
       raw: rawApiValue,
-      oneHour: oneHourRate,
-      eightHour: eightHourRate,
-      daily: dailyRate,
+      oneHour: oneHourRate * 100,
+      eightHour: eightHourRate * 100,
+      daily: dailyRate * 100,
       yearly: yearlyAPY,
     };
   };
