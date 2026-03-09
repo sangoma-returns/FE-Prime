@@ -31,8 +31,6 @@ interface FundingRateArbPageProps {
 }
 
 export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrder, preselectedTrade, onOpenDeposit, onOpenWithdraw, onOpenTransfer, onNavigate }: FundingRateArbPageProps) {
-  const SUPPORTED_EXCHANGES = ['Hyperliquid'];
-  const SUPPORTED_EXCHANGE_ID = 'hyperliquid';
   const { theme, colors } = useThemeStore();
   const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
   const openOrders = useTradesStore((state) => state.openOrders);
@@ -54,12 +52,12 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
   const [directionalBias, setDirectionalBias] = useState(65);
   const [clipSize, setClipSize] = useState('');
   
-  const [selectedBuyAccount, setSelectedBuyAccount] = useState(SUPPORTED_EXCHANGE_ID);
+  const [selectedBuyAccount, setSelectedBuyAccount] = useState('');
   const [selectedBuyPair, setSelectedBuyPair] = useState('');
   const [buyQuantity, setBuyQuantity] = useState('');
   const [buyLeverage, setBuyLeverage] = useState('');
   
-  const [selectedSellAccount, setSelectedSellAccount] = useState(SUPPORTED_EXCHANGE_ID);
+  const [selectedSellAccount, setSelectedSellAccount] = useState('');
   const [selectedSellPair, setSelectedSellPair] = useState('');
   const [sellQuantity, setSellQuantity] = useState('');
   const [sellLeverage, setSellLeverage] = useState('');
@@ -106,9 +104,9 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
   // Preselect trade if provided
   useEffect(() => {
     if (preselectedTrade) {
-      setSelectedBuyAccount(SUPPORTED_EXCHANGE_ID);
+      setSelectedBuyAccount(preselectedTrade.buyExchange);
       setSelectedBuyPair(preselectedTrade.buyToken);
-      setSelectedSellAccount(SUPPORTED_EXCHANGE_ID);
+      setSelectedSellAccount(preselectedTrade.sellExchange);
       setSelectedSellPair(preselectedTrade.sellToken);
     }
   }, [preselectedTrade]);
@@ -609,7 +607,7 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
       {showBuyExchangeSelector && (
         <ExchangePairSelector
           mode="exchange"
-          enabledExchanges={SUPPORTED_EXCHANGES}
+          enabledExchanges={enabledExchanges}
           onSelect={(exchange, pair) => {
             setSelectedBuyAccount(exchange);
             if (pair) setSelectedBuyPair(pair);
@@ -622,7 +620,7 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
         <ExchangePairSelector
           mode="pair"
           currentExchange={selectedBuyAccount}
-          enabledExchanges={SUPPORTED_EXCHANGES}
+          enabledExchanges={enabledExchanges}
           onSelect={(exchange, pair) => setSelectedBuyPair(pair)}
           onClose={() => setShowBuyPairSelector(false)}
         />
@@ -631,7 +629,7 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
       {showSellExchangeSelector && (
         <ExchangePairSelector
           mode="exchange"
-          enabledExchanges={SUPPORTED_EXCHANGES}
+          enabledExchanges={enabledExchanges}
           onSelect={(exchange, pair) => {
             setSelectedSellAccount(exchange);
             if (pair) setSelectedSellPair(pair);
@@ -644,7 +642,7 @@ export default function FundingRateArbPage({ enabledExchanges = [], onCreateOrde
         <ExchangePairSelector
           mode="pair"
           currentExchange={selectedSellAccount}
-          enabledExchanges={SUPPORTED_EXCHANGES}
+          enabledExchanges={enabledExchanges}
           onSelect={(exchange, pair) => setSelectedSellPair(pair)}
           onClose={() => setShowSellPairSelector(false)}
         />

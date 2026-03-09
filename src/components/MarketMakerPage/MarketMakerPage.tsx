@@ -73,14 +73,13 @@ export default function MarketMakerPage({
   enabledExchanges = [],
   onNavigateToStrategy,
 }: MarketMakerPageProps) {
-  const SUPPORTED_EXCHANGE = 'Hyperliquid';
   const { colors } = useThemeStore();
   const deployMarketMakerStrategies = useAppStore((s) => s.deployMarketMakerStrategies);
   const { addTrade, addOrder } = useTradesStore();
   const { exchanges, assets, getAsset } = useMarketDataStore();
   
   // Get exchanges and pairs from centralized store
-  const EXCHANGES = [SUPPORTED_EXCHANGE];
+  const EXCHANGES = exchanges.map(ex => ex.name);
   const PAIRS = Array.from(assets.values()).map(asset => 
     asset.symbol + '/USDC'
   );
@@ -102,7 +101,7 @@ export default function MarketMakerPage({
   const [slippageTolerance, setSlippageTolerance] = useState('0.5');
   const [maxDrawdown, setMaxDrawdown] = useState('5');
   
-  const [selectedExchange, setSelectedExchange] = useState(SUPPORTED_EXCHANGE);
+  const [selectedExchange, setSelectedExchange] = useState('');
   const [selectedPair, setSelectedPair] = useState('');
   const [margin, setMargin] = useState('');
   const [leverage, setLeverage] = useState('1');
@@ -179,7 +178,7 @@ export default function MarketMakerPage({
     {
       id: '1',
       name: 'Strategy 1',
-      exchange: SUPPORTED_EXCHANGE,
+      exchange: '',
       pair: '',
       margin: '',
       leverage: '1',
@@ -1887,7 +1886,7 @@ export default function MarketMakerPage({
                       {
                         id: newId,
                         name: `Strategy ${newId}`,
-                        exchange: SUPPORTED_EXCHANGE,
+                        exchange: '',
                         pair: '',
                         margin: '',
                         leverage: '1',
@@ -3600,7 +3599,7 @@ export default function MarketMakerPage({
         <ExchangePairSelector
           mode="exchange"
           currentExchange={editingStrategyId ? strategies.find(s => s.id === editingStrategyId)?.exchange : selectedExchange}
-          enabledExchanges={[SUPPORTED_EXCHANGE]}
+          enabledExchanges={enabledExchanges}
           onSelect={(exchange, pair) => {
             if (editingStrategyId) {
               // Update the specific strategy being edited

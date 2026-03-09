@@ -67,7 +67,6 @@ export function AggregatorPage({
   onCreateOrder,
   onNavigate,
 }: AggregatorPageProps) {
-  const SUPPORTED_EXCHANGE = 'Hyperliquid';
   const { colors, theme } = useThemeStore();
   const { addTradeToHistory, addOpenOrder } = useAppStore();
   const { addTrade, addOrder, addHistoryEntry } = useTradesStore();
@@ -86,7 +85,7 @@ export function AggregatorPage({
   const [priceUnit, setPriceUnit] = useState('%');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [exchangesDropdownOpen, setExchangesDropdownOpen] = useState(false);
-  const [selectedExchanges, setSelectedExchanges] = useState<string[]>([SUPPORTED_EXCHANGE]);
+  const [selectedExchanges, setSelectedExchanges] = useState<string[]>([]);
   const [strategiesDropdownOpen, setStrategiesDropdownOpen] = useState(false);
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>(['Impact Minimization']);
   const [assetDropdownOpen, setAssetDropdownOpen] = useState(false);
@@ -203,7 +202,7 @@ export function AggregatorPage({
   const selectedMarket = parseSelectedMarket(selectedAsset);
   
   // Get exchanges from centralized store
-  const allExchanges = [SUPPORTED_EXCHANGE];
+  const allExchanges = exchanges.map(ex => ex.name);
   
   // Parse selectedAsset to get base and quote tokens
   const baseToken = selectedAsset.split(':')[0]; // e.g., "BTC", "SILVER", "AAPL"
@@ -313,8 +312,11 @@ export function AggregatorPage({
   ];
 
   const toggleExchange = (exchange: string) => {
-    if (exchange !== SUPPORTED_EXCHANGE) return;
-    setSelectedExchanges([SUPPORTED_EXCHANGE]);
+    setSelectedExchanges(prev => 
+      prev.includes(exchange) 
+        ? prev.filter(e => e !== exchange)
+        : [...prev, exchange]
+    );
   };
   
   const toggleStrategy = (strategy: string) => {
@@ -661,13 +663,7 @@ export function AggregatorPage({
   // Load a template
   const handleLoadTemplate = (template: any) => {
     const { settings } = template;
-    const templateExchanges = Array.isArray(settings.selectedExchanges)
-      ? settings.selectedExchanges
-      : [];
-    const hasHyperliquid = templateExchanges.some(
-      (exchange: string) => exchange.toLowerCase() === SUPPORTED_EXCHANGE.toLowerCase()
-    );
-    setSelectedExchanges(hasHyperliquid ? [SUPPORTED_EXCHANGE] : [SUPPORTED_EXCHANGE]);
+    setSelectedExchanges(Array.isArray(settings.selectedExchanges) ? settings.selectedExchanges : []);
     setSelectedStrategies(settings.selectedStrategies);
     setSelectedAsset(settings.selectedAsset);
     setBtcAmount(settings.btcAmount);
@@ -1301,7 +1297,7 @@ export function AggregatorPage({
                   <div className="relative group">
                     <HelpCircle className={`w-4 h-4 ${colors.text.tertiary} cursor-help`} />
                     <div className={`absolute left-0 top-full mt-2 hidden group-hover:block w-48 ${colors.bg.primary} border ${colors.border.secondary} rounded px-3 py-2 text-[12px] leading-relaxed ${colors.text.primary} shadow-lg z-[10000] pointer-events-none`}>
-                      Hyperliquid is the only supported execution venue in this release.
+                      Select multiple exchanges to enable a smart order routing engine that evaluates price, available liquidity, fees, and latency, and dynamically splits execution across venues. This reduces market impact and improves average fill quality compared to executing on a single exchange.
                     </div>
                   </div>
                 </div>
@@ -1310,9 +1306,11 @@ export function AggregatorPage({
                   className={`w-full ${colors.bg.secondary} border ${colors.border.secondary} rounded px-2 py-1.5 text-xs ${colors.text.primary} flex items-center justify-between`}
                 >
                   <span>
-                    {selectedExchanges.length === 0
-                      ? 'Select exchange'
-                      : SUPPORTED_EXCHANGE}
+                    {selectedExchanges.length === 0 
+                      ? 'Select exchanges' 
+                      : selectedExchanges.length === allExchanges.length
+                      ? 'All exchanges'
+                      : `${selectedExchanges.length} selected`}
                   </span>
                   <ChevronDown className={`w-3 h-3 ${colors.text.tertiary} transition-transform ${exchangesDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -2195,7 +2193,7 @@ export function AggregatorPage({
                   // For buy orders: show long account/pair, use "-" for short
                   // For sell orders: show short account/pair, use "-" for long
                   const newOpenOrder = {
-                    longAccount: orderSide === 'buy' ? (selectedExchanges[0] || SUPPORTED_EXCHANGE) : '-',
+                    longAccount: orderSide === 'buy' ? (selectedExchanges[0] || 'Paradex') : '-',
                     longPair: orderSide === 'buy' ? selectedAsset.replace(':', '-') : '-',
                     shortAccount: orderSide === 'sell' ? (selectedExchanges[0] || 'Hyperliquid') : '-',
                     shortPair: orderSide === 'sell' ? selectedAsset.replace(':', '-') : '-',
@@ -2208,7 +2206,7 @@ export function AggregatorPage({
                   addOpenOrder(newOpenOrder);
                   
                   // Add to global trades store
-                  const exchange = selectedExchanges[0] || SUPPORTED_EXCHANGE;
+                  const exchange = selectedExchanges[0] || 'Paradex';
                   const token = selectedAsset.split(':')[0];
                   const price = limitPriceMode === 'Dynamic' ? currentPrice : parseFloat(limitPrice) || currentPrice;
                   
@@ -2376,7 +2374,7 @@ export function AggregatorPage({
                     buyPair: selectedAsset,
                     buyQuantity: parseFloat(btcAmount) || 0,
                     buyPrice: limitPriceMode === 'Dynamic' ? undefined : parseFloat(limitPrice),
-                    sellExchange: selectedExchanges[1] || SUPPORTED_EXCHANGE,
+                    sellExchange: selectedExchanges[1] || 'Paradex',
                     sellPair: selectedAsset,
                     sellQuantity: parseFloat(btcAmount) || 0,
                     sellPrice: limitPriceMode === 'Dynamic' ? undefined : parseFloat(limitPrice),
